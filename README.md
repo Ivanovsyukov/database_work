@@ -1,201 +1,185 @@
-# Техническое задание: Система управления библиотечным фондом
-
-## Описание проекта
+# Техническое задание
 
 ### Наименование
-База данных системы управления библиотечным фондом
+**"База данных системы управления библиотечным фондом для учета книг, читателей, выдачи литературы и управления библиотечными процессами"**
 
 ### Предметная область
-Система предназначена для автоматизации работы библиотеки. Она позволяет вести учет книг, авторов, издательств, регистрировать читателей, оформлять выдачу и возврат литературы, управлять бронированиями и начислять штрафы за просрочку.
+База данных системы управления библиотечным фондом - это комплексная система для автоматизации работы библиотеки. Она обеспечивает учет книжного фонда, регистрацию читателей, оформление выдачи и возврата книг, управление бронированиями и начисление штрафов.
 
-## Структура данных
+Основные цели системы:
+- Учет библиотечного инвентаря (книги, авторы, издательства, физические копии)
+- Регистрация и управление читателями (членами библиотеки)
+- Оформление выдачи и возврата книг с контролем сроков
+- Управление бронированием книг
+- Автоматическое начисление и учет штрафов за просрочку возврата
+- Учет сотрудников библиотеки и разграничение их прав доступа
+- Генерация отчетов по активности читателей и популярности книг
 
-### Таблицы и ограничения
+## Данные
+### Для каждого элемента данных - ограничения
 
-#### Authors (Авторы)
-| Поле | Тип | Ограничения |
-|------|-----|-------------|
-| author_id | INTEGER | PRIMARY KEY, AUTOINCREMENT, NOT NULL |
-| first_name | VARCHAR(50) | NOT NULL, CHECK(first_name <> '') |
-| last_name | VARCHAR(50) | NOT NULL, CHECK(last_name <> '') |
-| birth_date | DATE | NULL |
-| bio | TEXT | NULL |
+### Таблица authors
+- id: INTEGER, PRIMARY KEY, AUTOINCREMENT, NOT NULL
+- first_name: VARCHAR(50), NOT NULL, CHECK(first_name <> '' AND first_name !~ '\d') - имя не пустое и без цифр
+- last_name: VARCHAR(50), NOT NULL, CHECK(last_name <> '' AND last_name !~ '\d') - фамилия не пустая и без цифр
+- birth_date: DATE, NULL, CHECK(birth_date > '1500-01-01') - дата рождения не ранее 1500 года
+- bio: TEXT, NULL
 
-#### Publishers (Издательства)
-| Поле | Тип | Ограничения |
-|------|-----|-------------|
-| publisher_id | INTEGER | PRIMARY KEY, AUTOINCREMENT, NOT NULL |
-| name | VARCHAR(100) | NOT NULL, UNIQUE, CHECK(name <> '') |
-| address | TEXT | NULL |
+### Таблица publishers
+- id: INTEGER, PRIMARY KEY, AUTOINCREMENT, NOT NULL
+- name: VARCHAR(100), NOT NULL, UNIQUE, CHECK(name <> '') - название не пустое
+- address: TEXT, NULL
 
-####  Books (Книги)
-| Поле | Тип | Ограничения |
-|------|-----|-------------|
-| book_id | INTEGER | PRIMARY KEY, AUTOINCREMENT, NOT NULL |
-| title | VARCHAR(255) | NOT NULL, CHECK(title <> '') |
-| isbn | VARCHAR(13) | UNIQUE, CHECK(LENGTH(isbn) = 13) |
-| publication_year | INTEGER | NOT NULL, CHECK между 1450 и текущим годом |
-| genre | VARCHAR(50) | NULL |
-| publisher_id | INTEGER | FOREIGN KEY REFERENCES publishers(publisher_id) |
+### Таблица books
+- id: INTEGER, PRIMARY KEY, AUTOINCREMENT, NOT NULL
+- title: VARCHAR(255), NOT NULL, CHECK(title <> '') - название не пустое
+- isbn: VARCHAR(13), UNIQUE, CHECK(LENGTH(isbn) = 13) - ISBN строго 13 символов
+- publication_year: INTEGER, NOT NULL, CHECK(publication_year >= 1450 AND publication_year <= EXTRACT(YEAR FROM CURRENT_DATE))
+- genre: VARCHAR(50), NULL
+- publisher_id: INTEGER, NOT NULL, FOREIGN KEY -> publishers(id), ON DELETE RESTRICT
 
-#### Book_Authors (Связь книг и авторов)
-| Поле | Тип | Ограничения |
-|------|-----|-------------|
-| book_id | INTEGER | FOREIGN KEY, NOT NULL |
-| author_id | INTEGER | FOREIGN KEY, NOT NULL |
-| | | PRIMARY KEY (book_id, author_id) |
+### Таблица book_authors
+- book_id: INTEGER, NOT NULL, FOREIGN KEY -> books(id), ON DELETE CASCADE
+- author_id: INTEGER, NOT NULL, FOREIGN KEY -> authors(id), ON DELETE CASCADE
+- PRIMARY KEY (book_id, author_id)
 
-#### Book_Copies (Копии книг)
-| Поле | Тип | Ограничения |
-|------|-----|-------------|
-| copy_id | INTEGER | PRIMARY KEY, AUTOINCREMENT, NOT NULL |
-| book_id | INTEGER | FOREIGN KEY, NOT NULL |
-| barcode | VARCHAR(20) | NOT NULL, UNIQUE, CHECK(barcode <> '') |
-| acquisition_date | DATE | NOT NULL, DEFAULT CURRENT_DATE |
-| status | VARCHAR(20) | NOT NULL, CHECK в ('available', 'borrowed', 'under maintenance', 'lost') |
+### Таблица book_copies
+- id: INTEGER, PRIMARY KEY, AUTOINCREMENT, NOT NULL
+- book_id: INTEGER, NOT NULL, FOREIGN KEY -> books(id), ON DELETE CASCADE
+- barcode: VARCHAR(20), NOT NULL, UNIQUE, CHECK(barcode <> '') - штрих-код не пустой
+- acquisition_date: DATE, NOT NULL, DEFAULT CURRENT_DATE
+- status: VARCHAR(20), NOT NULL, CHECK(status IN ('available', 'borrowed', 'under maintenance', 'lost'))
 
-#### Members (Читатели)
-| Поле | Тип | Ограничения |
-|------|-----|-------------|
-| member_id | INTEGER | PRIMARY KEY, AUTOINCREMENT, NOT NULL |
-| first_name | VARCHAR(50) | NOT NULL, CHECK(first_name <> '') |
-| last_name | VARCHAR(50) | NOT NULL, CHECK(last_name <> '') |
-| email | VARCHAR(100) | NOT NULL, UNIQUE, CHECK(email LIKE '%@%') |
-| phone | VARCHAR(20) | NULL |
-| address | TEXT | NULL |
-| membership_start_date | DATE | NOT NULL, DEFAULT CURRENT_DATE |
-| membership_status | VARCHAR(20) | NOT NULL, CHECK в ('active', 'suspended', 'expired') |
+### Таблица members
+- id: INTEGER, PRIMARY KEY, AUTOINCREMENT, NOT NULL
+- first_name: VARCHAR(50), NOT NULL, CHECK(first_name <> '' AND first_name !~ '\d')
+- last_name: VARCHAR(50), NOT NULL, CHECK(last_name <> '' AND last_name !~ '\d')
+- email: VARCHAR(100), NOT NULL, UNIQUE, CHECK(email LIKE '%@%') - email должен содержать @
+- phone: VARCHAR(20), NULL
+- address: TEXT, NULL
+- membership_start_date: DATE, NOT NULL, DEFAULT CURRENT_DATE
+- membership_status: VARCHAR(20), NOT NULL, CHECK(membership_status IN ('active', 'suspended', 'expired'))
 
-#### Staff (Сотрудники)
-| Поле | Тип | Ограничения |
-|------|-----|-------------|
-| staff_id | INTEGER | PRIMARY KEY, AUTOINCREMENT, NOT NULL |
-| first_name | VARCHAR(50) | NOT NULL, CHECK(first_name <> '') |
-| last_name | VARCHAR(50) | NOT NULL, CHECK(last_name <> '') |
-| email | VARCHAR(100) | NOT NULL, UNIQUE, CHECK(email LIKE '%@%') |
-| role | VARCHAR(20) | NOT NULL, CHECK в ('librarian', 'admin') |
+### Таблица staff
+- id: INTEGER, PRIMARY KEY, AUTOINCREMENT, NOT NULL
+- first_name: VARCHAR(50), NOT NULL, CHECK(first_name <> '' AND first_name !~ '\d')
+- last_name: VARCHAR(50), NOT NULL, CHECK(last_name <> '' AND last_name !~ '\d')
+- email: VARCHAR(100), NOT NULL, UNIQUE, CHECK(email LIKE '%@%')
+- role: VARCHAR(20), NOT NULL, CHECK(role IN ('librarian', 'admin'))
 
-#### Loans (Выдачи книг)
-| Поле | Тип | Ограничения |
-|------|-----|-------------|
-| loan_id | INTEGER | PRIMARY KEY, AUTOINCREMENT, NOT NULL |
-| copy_id | INTEGER | FOREIGN KEY, NOT NULL |
-| member_id | INTEGER | FOREIGN KEY, NOT NULL |
-| loan_date | DATE | NOT NULL, DEFAULT CURRENT_DATE |
-| due_date | DATE | NOT NULL, CHECK(due_date > loan_date) |
-| return_date | DATE | NULL, CHECK(return_date >= loan_date) |
-| status | VARCHAR(20) | NOT NULL, CHECK в ('active', 'returned', 'overdue') |
+### Таблица loans
+- id: INTEGER, PRIMARY KEY, AUTOINCREMENT, NOT NULL
+- copy_id: INTEGER, NOT NULL, FOREIGN KEY -> book_copies(id), ON DELETE RESTRICT
+- member_id: INTEGER, NOT NULL, FOREIGN KEY -> members(id), ON DELETE RESTRICT
+- loan_date: DATE, NOT NULL, DEFAULT CURRENT_DATE
+- due_date: DATE, NOT NULL, CHECK(due_date > loan_date) - срок возврата должен быть после даты выдачи
+- return_date: DATE, NULL, CHECK(return_date IS NULL OR return_date >= loan_date)
+- status: VARCHAR(20), NOT NULL, CHECK(status IN ('active', 'returned', 'overdue'))
 
-#### Fines (Штрафы)
-| Поле | Тип | Ограничения |
-|------|-----|-------------|
-| fine_id | INTEGER | PRIMARY KEY, AUTOINCREMENT, NOT NULL |
-| loan_id | INTEGER | FOREIGN KEY, UNIQUE, NOT NULL |
-| member_id | INTEGER | FOREIGN KEY, NOT NULL |
-| fine_amount | DECIMAL(10,2) | NOT NULL, CHECK(fine_amount >= 0) |
-| issue_date | DATE | NOT NULL, DEFAULT CURRENT_DATE |
-| paid_date | DATE | NULL |
-| status | VARCHAR(20) | NOT NULL, CHECK в ('pending', 'paid') |
+### Таблица fines
+- id: INTEGER, PRIMARY KEY, AUTOINCREMENT, NOT NULL
+- loan_id: INTEGER, NOT NULL, UNIQUE, FOREIGN KEY -> loans(id), ON DELETE CASCADE
+- member_id: INTEGER, NOT NULL, FOREIGN KEY -> members(id), ON DELETE CASCADE
+- fine_amount: DECIMAL(10,2), NOT NULL, CHECK(fine_amount >= 0) - сумма штрафа неотрицательная
+- issue_date: DATE, NOT NULL, DEFAULT CURRENT_DATE
+- paid_date: DATE, NULL
+- status: VARCHAR(20), NOT NULL, CHECK(status IN ('pending', 'paid'))
 
-#### Reservations (Бронирования)
-| Поле | Тип | Ограничения |
-|------|-----|-------------|
-| reservation_id | INTEGER | PRIMARY KEY, AUTOINCREMENT, NOT NULL |
-| book_id | INTEGER | FOREIGN KEY, NOT NULL |
-| member_id | INTEGER | FOREIGN KEY, NOT NULL |
-| reservation_date | TIMESTAMP | NOT NULL, DEFAULT CURRENT_TIMESTAMP |
-| expiry_date | DATE | NOT NULL |
-| status | VARCHAR(20) | NOT NULL, CHECK в ('active', 'fulfilled', 'cancelled') |
+### Таблица reservations
+- id: INTEGER, PRIMARY KEY, AUTOINCREMENT, NOT NULL
+- book_id: INTEGER, NOT NULL, FOREIGN KEY -> books(id), ON DELETE CASCADE
+- member_id: INTEGER, NOT NULL, FOREIGN KEY -> members(id), ON DELETE CASCADE
+- reservation_date: TIMESTAMP, NOT NULL, DEFAULT CURRENT_TIMESTAMP
+- expiry_date: DATE, NOT NULL
+- status: VARCHAR(20), NOT NULL, CHECK(status IN ('active', 'fulfilled', 'cancelled'))
 
-## Ограничения целостности
+## Общие ограничения целостности
 
-### Бизнес-правила
-1. **Лимит выдач**: Читатель не может иметь более 5 активных выдач одновременно
-2. **Доступность книг**: Нельзя оформить выдачу для книги со статусом, отличным от 'available'
-3. **Уникальность бронирований**: Читатель не может бронировать одну и ту же книгу повторно
-4. **Автоматизация штрафов**: 
-   - Автоматическое изменение статуса выдачи на 'overdue' при просрочке
-   - Автоматическое начисление штрафа при переходе в статус 'overdue'
-   - Расчет штрафа: количество дней просрочки × 10 рублей
-
-### Референциальная целостность
-- Все внешние ключи ссылаются на существующие записи
-- Каскадное удаление связанных данных
-- Запрет на удаление записей с активными ссылками
+- Все внешние ключи (FOREIGN KEY) должны ссылаться на существующие записи
+- Нельзя оформить выдачу для книги со статусом, отличным от 'available'
+- Один читатель не может иметь более 5 активных выдач одновременно
+- Читатель не может бронировать одну и ту же книгу повторно
+- В таблице book_authors запрещены дублирующиеся пары (book_id, author_id)
+- Поля, участвующие в связях (book_id, author_id, member_id, copy_id и др.), не могут быть NULL
+- Поля, критичные для бизнес-логики (title, isbn, email, role, status), не могут быть NULL
+- При удалении книги должны каскадно удаляться все её копии и связи с авторами
+- При удалении читателя должны удаляться все его выдачи, штрафы и бронирования
+- В таблице loans срок возврата должен быть больше даты выдачи
+- Автоматическое изменение статуса выдачи на 'overdue' при просрочке возврата
+- Автоматическое начисление штрафа при переходе выдачи в статус 'overdue'
+- Сумма штрафа рассчитывается как: количество дней просрочки × 10 рублей
 
 ## Пользовательские роли
+### Для каждой роли - наименование, ответственность, количество пользователей в этой роли?
 
-### Администратор
-- **Ответственность**: Полный доступ ко всем данным, управление сотрудниками, генерация отчетов
-- **Количество**: 1-2 пользователя
+**Роль Администратор**
+- **Наименование:** Администратор системы
+- **Ответственность:** Полный доступ ко всем данным системы. Управление учетными записями сотрудников. Генерация отчетов по работе библиотеки. Настройка системных параметров (размер штрафа, сроки выдачи). Просмотр и анализ статистики.
+- **Количество пользователей:** 1-2
 
-### Библиотекарь
-- **Ответственность**: Оформление выдачи/возврата, регистрация читателей, управление книгами
-- **Количество**: 5-10 пользователей
+**Роль Библиотекарь**
+- **Наименование:** Сотрудник библиотеки
+- **Ответственность:** Оформление выдачи и возврата книг. Регистрация новых читателей. Обслуживание бронирований. Начисление и снятие штрафов. Управление информацией о книгах и копиях.
+- **Количество пользователей:** 5-10
 
-### Читатель
-- **Ответственность**: Просмотр каталога, бронирование книг, соблюдение сроков возврата
-- **Количество**: Не ограничено
+**Роль Читатель**
+- **Наименование:** Читатель библиотеки
+- **Ответственность:** Просмотр каталога книг. Бронирование доступных книг. Просмотр своей истории выдач и текущих штрафов. Соблюдение сроков возврата книг.
+- **Количество пользователей:** не ограничено
 
-## API Endpoints
+## UI / API
 
-### Аутентификация и профили
-- `POST /auth/login` - Авторизация
-- `GET /members` - Список читателей
-- `POST /members` - Регистрация читателя
+* Аутентификация и управление профилями
+- POST /auth/login - авторизация сотрудников
+- POST /auth/logout - выход из системы
+- GET /members - список читателей
+- POST /members - регистрация нового читателя
+- GET /members/{id} - информация о читателе
+- PUT /members/{id} - редактирование данных читателя
 
-### Управление книгами
-- `GET /books` - Каталог книг (с фильтрацией)
-- `POST /books` - Добавление книги
-- `GET /books/{id}` - Информация о книге
+* Управление книгами и авторами
+- GET /books - каталог книг (с фильтрацией по автору, жанру, году)
+- POST /books - добавление новой книги
+- GET /books/{id} - информация о книге
+- PUT /books/{id} - редактирование данных книги
+- GET /authors - список авторов
+- POST /authors - добавление нового автора
 
-### Выдача и возврат
-- `POST /loans` - Оформление выдачи
-- `PUT /loans/{id}/return` - Возврат книги
-- `GET /loans/active` - Активные выдачи
+* Выдача и возврат книг
+- POST /loans - оформление выдачи книги
+- PUT /loans/{id}/return - оформление возврата книги
+- GET /loans/active - активные выдачи
+- GET /loans/overdue - просроченные выдачи
 
-### Бронирование
-- `POST /reservations` - Бронирование книги
-- `GET /reservations/active` - Активные бронирования
+* Бронирование книг
+- POST /reservations - создание бронирования
+- GET /reservations/active - активные бронирования
+- PUT /reservations/{id}/cancel - отмена бронирования
 
-### Штрафы
-- `GET /fines` - Список штрафов
-- `PUT /fines/{id}/pay` - Оплата штрафа
+* Управление штрафами
+- GET /fines - список штрафов
+- PUT /fines/{id}/pay - отметка об оплате штрафа
+- GET /fines/member/{id} - штрафы конкретного читателя
 
-### Отчеты
-- `GET /reports/popular-books` - Популярные книги
-- `GET /reports/member-activity` - Активность читателей
+* Отчеты и аналитика
+- GET /reports/popular-books - самые популярные книги
+- GET /reports/member-activity - активность читателей
+- GET /reports/fines-summary - сводка по штрафам
 
-## Технологический стек
+## Технологии разработки
 
-### Backend
-- **Язык**: Python 3.11+
-- **Фреймворк**: FastAPI
-- **СУБД**: PostgreSQL 15+
+### Язык программирования
+Мы будем использовать Python для бэкенд части, а конкретнее фреймворк FastAPI. Для фронтенд разработки воспользуемся React с TypeScript.
 
-### Frontend
-- **Язык**: TypeScript
-- **Фреймворк**: React 18+
-
-### Тестирование
-- **Фреймворк**: pytest
-- **Покрытие**: pytest-cov
-- **Данные**: factory_boy
-- **API**: httpx
+### СУБД
+- PostgreSQL
 
 ## Тестирование
-
-### Модульное тестирование
-- Тестирование моделей данных
-- Проверка ограничений целостности
-- Тестирование бизнес-логики
-
-### Интеграционное тестирование
-- Тестирование API endpoints
-- Проверка работы с базой данных
-- Тестирование сценариев использования
-
-### Нагрузочное тестирование
-- Тестирование производительности
-- Проверка ограничений базы данных
-- Оптимизация запросов
+- pytest - основной фреймворк для тестирования
+- pytest-asyncio - для асинхронного тестирования FastAPI
+- pytest-cov - измерение покрытия кода тестами
+- factory_boy - создание тестовых данных
+- httpx - тестирование API эндпоинтов
+- pytest-postgresql - временная PostgreSQL для тестов
+- Тестирование всех ограничений целостности базы данных
+- Тестирование бизнес-логики (начисление штрафов, проверка доступности книг)
