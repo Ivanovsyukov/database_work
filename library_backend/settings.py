@@ -37,6 +37,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
+    'django_extensions',
     'library'
 ]
 
@@ -75,8 +77,12 @@ WSGI_APPLICATION = 'library_backend.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'library_db',      # название базы
+        'USER': 'postgres',        # пользователь PostgreSQL
+        'PASSWORD': 'bo2005ok',    # пароль от него
+        'HOST': 'localhost',       # адрес (или имя контейнера)
+        'PORT': '5432',            # порт PostgreSQL
     }
 }
 
