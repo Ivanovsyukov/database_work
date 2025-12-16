@@ -2,3 +2,8 @@
 __pycache__/
 *.pyc
 db.sqlite3
+*.pyo
+*.pyd
+.pytest_cache/
+htmlcov/
+.coverage
