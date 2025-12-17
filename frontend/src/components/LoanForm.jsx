@@ -1,0 +1,105 @@
+// frontend/src/components/LoanForm.jsx
+import { useState } from 'react';
+import axios from 'axios';
+import BookAutocomplete from './BookAutocomplete';
+
+export default function LoanForm() {
+  const [selectedBookId, setSelectedBookId] = useState(null);
+  const [availableCopies, setAvailableCopies] = useState([]);
+  const [selectedCopyId, setSelectedCopyId] = useState(null);
+  const [memberId, setMemberId] = useState('');
+  const [message, setMessage] = useState('');
+
+  // При выборе книги — загружаем доступные копии
+  const handleBookSelect = async (bookId, bookTitle) => {
+    setSelectedBookId(bookId);
+    setSelectedCopyId(null);
+    setAvailableCopies([]);
+    if (!bookId) return;
+
+    try {
+      const res = await axios.get(`http://localhost:8000/api/copies/?book_id=${bookId}&status=available`);
+      setAvailableCopies(res.data);
+    } catch (err) {
+      console.error("Ошибка загрузки копий", err);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedCopyId || !memberId) {
+      setMessage('Выберите копию и укажите ID читателя');
+      return;
+    }
+
+    try {
+      await axios.post('http://localhost:8000/api/loans/', {
+        copy: selectedCopyId,
+        member: memberId,
+        issued_by_staff_id: 1 // или получать из сессии
+      });
+      setMessage('✅ Книга выдана!');
+      setSelectedBookId(null);
+      setSelectedCopyId(null);
+      setAvailableCopies([]);
+      setMemberId('');
+    } catch (err) {
+      setMessage('❌ Ошибка: ' + (err.response?.data?.error || 'не удалось выдать'));
+    }
+  };
+
+  return (
+    <div>
+      <h2>Оформить выдачу</h2>
+      <form onSubmit={handleSubmit}>
+        <div style={{ marginBottom: '12px' }}>
+          <label>Книга:</label>
+          <BookAutocomplete
+            value={selectedBookId}
+            onChange={handleBookSelect}
+            placeholder="Введите название книги..."
+          />
+        </div>
+
+        {availableCopies.length > 0 && (
+          <div style={{ marginBottom: '12px' }}>
+            <label>Доступные копии:</label>
+            <select
+              value={selectedCopyId || ''}
+              onChange={(e) => setSelectedCopyId(Number(e.target.value))}
+              style={{ width: '100%', padding: '6px', marginTop: '4px' }}
+              required
+            >
+              <option value="">Выберите копию</option>
+              {availableCopies.map(copy => (
+                <option key={copy.id} value={copy.id}>
+                  Штрихкод: {copy.barcode}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div style={{ marginBottom: '12px' }}>
+          <label>
+            ID читателя:
+            <input
+              type="number"
+              value={memberId}
+              onChange={(e) => setMemberId(e.target.value)}
+              style={{ width: '100%', padding: '6px', marginTop: '4px' }}
+              required
+            />
+          </label>
+        </div>
+
+        <button type="submit">Выдать книгу</button>
+        {message && (
+          <p style={{ marginTop: '10px', color: message.startsWith('✅') ? 'green' : 'red' }}>
+            {message}
+          </p>
+        )}
+      </form>
+    </div>
+  );
+}

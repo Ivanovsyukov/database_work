@@ -215,3 +215,11 @@ React.
 - requests или httpx - тестирование API.
 - django.test.Client / APIClient (DRF) - для тестирования эндпоинтов REST API.
 - pytest-postgresql - временная PostgreSQL для тестов.
+
+### Как запустить проект
+1. Установите зависимости - `pip install -r requirements.txt`
+2. Cоздайте Postgresql базу данных и внесите данные о ней в library_backend/settings.py
+2. Примените миграции - `python manage.py migrate`
+3. Создайте суперпользователя(нужен для создания админов) - `python manage.py createsuperuser`
+4. Запустите Бэкенд - `python manage.py runserver` → бэкенд на `:8000`
+5. Запустите фронтенд - `cd frontend', 'npm install' и 'npm run dev` → фронтенд на `:5173`

@@ -23,7 +23,9 @@ class PublisherSerializer(serializers.ModelSerializer):
 class BookSerializer(serializers.ModelSerializer):
     publisher = PublisherSerializer(read_only=True)
     publisher_id = serializers.PrimaryKeyRelatedField(
-        queryset=Publisher.objects.all(), source='publisher', write_only=True
+        queryset=Publisher.objects.all(),
+        source='publisher',
+        write_only=True
     )
 
     class Meta:
@@ -51,7 +53,6 @@ class MemberSerializer(serializers.ModelSerializer):
         model = Member
         fields = '__all__'
 
-
 class StaffSerializer(serializers.ModelSerializer):
     class Meta:
         model = Staff
@@ -66,20 +67,23 @@ class LoanSerializer(serializers.ModelSerializer):
     class Meta:
         model = Loan
         fields = '__all__'
+        read_only_fields = ['return_date', 'status']
+
     def validate(self, data):
         instance = Loan(**data)
-        instance.full_clean()
+        try:
+            instance.full_clean()
+        except Exception as e:
+            raise serializers.ValidationError(e)
         return data
 
     def create(self, validated_data):
-        loan = Loan(**validated_data)
-        loan.full_clean()
-        loan.save()
+        loan = Loan.objects.create(**validated_data)
         return loan
 
     def update(self, instance, validated_data):
-        for key, value in validated_data.items():
-            setattr(instance, key, value)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
         instance.full_clean()
         instance.save()
         return instance
@@ -89,20 +93,23 @@ class FineSerializer(serializers.ModelSerializer):
     class Meta:
         model = Fine
         fields = '__all__'
+        read_only_fields = ['issue_date', 'status']
 
 
 class ReservationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Reservation
         fields = '__all__'
-    
+        read_only_fields = ['status']
+
     def validate(self, data):
         instance = Reservation(**data)
-        instance.full_clean()
+        try:
+            instance.full_clean()
+        except Exception as e:
+            raise serializers.ValidationError(e)
         return data
 
     def create(self, validated_data):
-        reservation = Reservation(**validated_data)
-        reservation.full_clean()
-        reservation.save()
+        reservation = Reservation.objects.create(**validated_data)
         return reservation

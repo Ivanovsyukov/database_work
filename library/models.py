@@ -9,6 +9,9 @@ from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 from django.utils import timezone
 
+def get_today_date():
+    return timezone.now().date()
+
 # --- Constants / Choices ---
 BOOK_COPY_STATUSES = (
     ('available', 'Available'),
@@ -62,10 +65,10 @@ class Author(models.Model):
     class Meta:
         db_table = "authors"
         constraints = [
-            models.CheckConstraint(check=~models.Q(first_name=''), name='author_first_name_not_empty'),
-            models.CheckConstraint(check=~models.Q(last_name=''), name='author_last_name_not_empty'),
+            models.CheckConstraint(condition=~models.Q(first_name=''), name='author_first_name_not_empty'),
+            models.CheckConstraint(condition=~models.Q(last_name=''), name='author_last_name_not_empty'),
             models.CheckConstraint(
-                check=(Q(birth_date__gt=date(1500, 1, 1)) | Q(birth_date__isnull=True)),
+                condition=(Q(birth_date__gt=date(1500, 1, 1)) | Q(birth_date__isnull=True)),
                 name='author_birth_date_valid'
             ),
         ]
@@ -82,7 +85,7 @@ class Publisher(models.Model):
     class Meta:
         db_table = "publishers"
         constraints = [
-            models.CheckConstraint(check=~models.Q(name=''), name='publisher_name_not_empty'),
+            models.CheckConstraint(condition=~models.Q(name=''), name='publisher_name_not_empty'),
         ]
 
     def __str__(self):
@@ -91,7 +94,7 @@ class Publisher(models.Model):
 
 class Book(models.Model):
     title = models.CharField(max_length=255, validators=[not_empty_validator])
-    isbn = models.CharField(max_length=13, unique=True, null=True, blank=True, validators=[isbn_validator])
+    isbn = models.CharField(max_length=13, unique=True, validators=[isbn_validator])
     publication_year = models.IntegerField()
     genre = models.CharField(max_length=50, null=True, blank=True)
     publisher = models.ForeignKey(Publisher, on_delete=models.RESTRICT, related_name='books')
@@ -100,8 +103,8 @@ class Book(models.Model):
     class Meta:
         db_table = "books"
         constraints = [
-            models.CheckConstraint(check=~models.Q(title=''), name='book_title_not_empty'),
-            models.CheckConstraint(check=Q(publication_year__gte=1450), name='book_publication_year_min'),
+            models.CheckConstraint(condition=~models.Q(title=''), name='book_title_not_empty'),
+            models.CheckConstraint(condition=Q(publication_year__gte=1450), name='book_publication_year_min'),
         ]
         ordering = ['title']
 
@@ -133,19 +136,18 @@ class BookAuthor(models.Model):
 class BookCopy(models.Model):
     book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name='copies')
     barcode = models.CharField(max_length=20, unique=True, validators=[not_empty_validator])
-    acquisition_date = models.DateField(default=timezone.now)
+    acquisition_date = models.DateField(default=get_today_date)
     status = models.CharField(max_length=20, choices=BOOK_COPY_STATUSES, default='available')
 
     class Meta:
         db_table = "book_copies"
         constraints = [
-            models.CheckConstraint(check=~models.Q(barcode=''), name='copy_barcode_not_empty'),
-            models.CheckConstraint(check=Q(status__in=[s[0] for s in BOOK_COPY_STATUSES]), name='copy_status_valid'),
+            models.CheckConstraint(condition=~models.Q(barcode=''), name='copy_barcode_not_empty'),
+            models.CheckConstraint(condition=Q(status__in=[s[0] for s in BOOK_COPY_STATUSES]), name='copy_status_valid'),
         ]
 
     def __str__(self):
         return f'Copy {self.barcode} of "{self.book.title}"'
-
 
 class Member(models.Model):
     first_name = models.CharField(max_length=50, validators=[no_digits_validator])
@@ -153,15 +155,15 @@ class Member(models.Model):
     email = models.EmailField(unique=True, validators=[EmailValidator()])
     phone = models.CharField(max_length=20, null=True, blank=True)
     address = models.TextField(null=True, blank=True)
-    membership_start_date = models.DateField(default=timezone.now)
+    membership_start_date = models.DateField(default=get_today_date)
     membership_status = models.CharField(max_length=20, choices=MEMBER_STATUS, default='active')
 
     class Meta:
         db_table = "members"
         constraints = [
-            models.CheckConstraint(check=~models.Q(first_name=''), name='member_first_name_not_empty'),
-            models.CheckConstraint(check=~models.Q(last_name=''), name='member_last_name_not_empty'),
-            models.CheckConstraint(check=Q(membership_status__in=[s[0] for s in MEMBER_STATUS]), name='member_status_valid'),
+            models.CheckConstraint(condition=~models.Q(first_name=''), name='member_first_name_not_empty'),
+            models.CheckConstraint(condition=~models.Q(last_name=''), name='member_last_name_not_empty'),
+            models.CheckConstraint(condition=Q(membership_status__in=[s[0] for s in MEMBER_STATUS]), name='member_status_valid'),
         ]
         ordering = ['last_name', 'first_name']
 
@@ -188,9 +190,9 @@ class Staff(models.Model):
     class Meta:
         db_table = "staff"
         constraints = [
-            models.CheckConstraint(check=~models.Q(first_name=''), name='staff_first_name_not_empty'),
-            models.CheckConstraint(check=~models.Q(last_name=''), name='staff_last_name_not_empty'),
-            models.CheckConstraint(check=Q(role__in=[r[0] for r in STAFF_ROLES]), name='staff_role_valid'),
+            models.CheckConstraint(condition=~models.Q(first_name=''), name='staff_first_name_not_empty'),
+            models.CheckConstraint(condition=~models.Q(last_name=''), name='staff_last_name_not_empty'),
+            models.CheckConstraint(condition=Q(role__in=[r[0] for r in STAFF_ROLES]), name='staff_role_valid'),
         ]
         ordering = ['last_name', 'first_name']
 
@@ -209,8 +211,8 @@ class Loan(models.Model):
     class Meta:
         db_table = "loans"
         constraints = [
-            models.CheckConstraint(check=Q(due_date__gt=F('loan_date')), name='loan_due_after_loan'),
-            models.CheckConstraint(check=Q(status__in=[s[0] for s in LOAN_STATUS]), name='loan_status_valid'),
+            models.CheckConstraint(condition=Q(due_date__gt=F('loan_date')), name='loan_due_after_loan'),
+            models.CheckConstraint(condition=Q(status__in=[s[0] for s in LOAN_STATUS]), name='loan_status_valid'),
         ]
         ordering = ['-loan_date']
 
@@ -299,8 +301,8 @@ class Fine(models.Model):
     class Meta:
         db_table = "fines"
         constraints = [
-            models.CheckConstraint(check=Q(fine_amount__gte=0), name='fine_amount_non_negative'),
-            models.CheckConstraint(check=Q(status__in=[s[0] for s in FINE_STATUS]), name='fine_status_valid'),
+            models.CheckConstraint(condition=Q(fine_amount__gte=0), name='fine_amount_non_negative'),
+            models.CheckConstraint(condition=Q(status__in=[s[0] for s in FINE_STATUS]), name='fine_status_valid'),
         ]
         ordering = ['-issue_date']
 
@@ -334,7 +336,7 @@ class Reservation(models.Model):
     class Meta:
         db_table = "reservations"
         constraints = [
-            models.CheckConstraint(check=Q(status__in=[s[0] for s in RESERVATION_STATUS]), name='reservation_status_valid'),
+            models.CheckConstraint(condition=Q(status__in=[s[0] for s in RESERVATION_STATUS]), name='reservation_status_valid'),
         ]
         ordering = ['-reservation_date']
 

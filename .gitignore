@@ -7,3 +7,5 @@ db.sqlite3
 .pytest_cache/
 htmlcov/
 .coverage
+frontend/node_modules/
+frontend/.vite/
