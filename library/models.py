@@ -4,9 +4,8 @@ from datetime import date
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator, MinValueValidator, EmailValidator
 from django.db import models, transaction
-from django.db.models import Q, Sum, F, Count
-from django.db.models.signals import pre_save, post_save
-from django.dispatch import receiver
+from django.db.models import Q, Sum, F
+from django.db.models.functions import ExtractYear, Now
 from django.utils import timezone
 
 def get_today_date():
@@ -68,6 +67,14 @@ class Author(models.Model):
             models.CheckConstraint(condition=~models.Q(first_name=''), name='author_first_name_not_empty'),
             models.CheckConstraint(condition=~models.Q(last_name=''), name='author_last_name_not_empty'),
             models.CheckConstraint(
+                condition=~models.Q(first_name__regex=r'[0-9]'),
+                name='author_first_name_no_digits',
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(last_name__regex=r'[0-9]'),
+                name='author_last_name_no_digits',
+            ),
+            models.CheckConstraint(
                 condition=(Q(birth_date__gt=date(1500, 1, 1)) | Q(birth_date__isnull=True)),
                 name='author_birth_date_valid'
             ),
@@ -105,6 +112,14 @@ class Book(models.Model):
         constraints = [
             models.CheckConstraint(condition=~models.Q(title=''), name='book_title_not_empty'),
             models.CheckConstraint(condition=Q(publication_year__gte=1450), name='book_publication_year_min'),
+            models.CheckConstraint(
+                condition=Q(publication_year__lte=ExtractYear(Now())),
+                name='book_publication_year_max_current',
+            ),
+            models.CheckConstraint(
+                condition=Q(isbn__regex=r'^[0-9]{13}$'),
+                name='book_isbn_13_digits',
+            ),
         ]
         ordering = ['title']
 
@@ -163,6 +178,18 @@ class Member(models.Model):
         constraints = [
             models.CheckConstraint(condition=~models.Q(first_name=''), name='member_first_name_not_empty'),
             models.CheckConstraint(condition=~models.Q(last_name=''), name='member_last_name_not_empty'),
+            models.CheckConstraint(
+                condition=~models.Q(first_name__regex=r'[0-9]'),
+                name='member_first_name_no_digits',
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(last_name__regex=r'[0-9]'),
+                name='member_last_name_no_digits',
+            ),
+            models.CheckConstraint(
+                condition=Q(email__contains='@'),
+                name='member_email_contains_at',
+            ),
             models.CheckConstraint(condition=Q(membership_status__in=[s[0] for s in MEMBER_STATUS]), name='member_status_valid'),
         ]
         ordering = ['last_name', 'first_name']
@@ -192,6 +219,18 @@ class Staff(models.Model):
         constraints = [
             models.CheckConstraint(condition=~models.Q(first_name=''), name='staff_first_name_not_empty'),
             models.CheckConstraint(condition=~models.Q(last_name=''), name='staff_last_name_not_empty'),
+            models.CheckConstraint(
+                condition=~models.Q(first_name__regex=r'[0-9]'),
+                name='staff_first_name_no_digits',
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(last_name__regex=r'[0-9]'),
+                name='staff_last_name_no_digits',
+            ),
+            models.CheckConstraint(
+                condition=Q(email__contains='@'),
+                name='staff_email_contains_at',
+            ),
             models.CheckConstraint(condition=Q(role__in=[r[0] for r in STAFF_ROLES]), name='staff_role_valid'),
         ]
         ordering = ['last_name', 'first_name']
@@ -203,7 +242,7 @@ class Staff(models.Model):
 class Loan(models.Model):
     copy = models.ForeignKey(BookCopy, on_delete=models.RESTRICT, related_name='loans')
     member = models.ForeignKey(Member, on_delete=models.RESTRICT, related_name='loans')
-    loan_date = models.DateField(default=timezone.now)
+    loan_date = models.DateField(default=get_today_date)
     due_date = models.DateField()
     return_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=LOAN_STATUS, default='active')
@@ -212,6 +251,10 @@ class Loan(models.Model):
         db_table = "loans"
         constraints = [
             models.CheckConstraint(condition=Q(due_date__gt=F('loan_date')), name='loan_due_after_loan'),
+            models.CheckConstraint(
+                condition=Q(return_date__isnull=True) | Q(return_date__gte=F('loan_date')),
+                name='loan_return_date_valid',
+            ),
             models.CheckConstraint(condition=Q(status__in=[s[0] for s in LOAN_STATUS]), name='loan_status_valid'),
         ]
         ordering = ['-loan_date']
@@ -247,44 +290,42 @@ class Loan(models.Model):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
-        # Ensure clean is called
         self.full_clean()
-        creating = self._state.adding
-        prev_status = None
-        if not creating:
-            try:
-                prev = Loan.objects.get(pk=self.pk)
-                prev_status = prev.status
-            except Loan.DoesNotExist:
-                prev_status = None
+
+        # Auto-switch to overdue when saving an existing active loan past due date.
+        if self.pk and self.status == 'active' and self.due_date and self.due_date < timezone.now().date():
+            self.status = 'overdue'
 
         with transaction.atomic():
             super().save(*args, **kwargs)  # save loan first
 
-            # If loan is active -> mark copy as borrowed
-            if self.status == 'active':
-                if self.copy.status != 'borrowed':
-                    self.copy.status = 'borrowed'
-                    self.copy.save(update_fields=['status'])
-            # If loan is returned -> free the copy
+            # Keep book copy status consistent with loan status.
+            if self.status in {'active', 'overdue'} and self.copy.status != 'borrowed':
+                self.copy.status = 'borrowed'
+                self.copy.save(update_fields=['status'])
+
             if self.status == 'returned':
                 if self.copy.status != 'available':
                     self.copy.status = 'available'
                     self.copy.save(update_fields=['status'])
-                # ensure return_date set
+
                 if not self.return_date:
                     self.return_date = timezone.now().date()
                     super().save(update_fields=['return_date'])
 
-            # If loan is overdue and there is no fine -> create fine
             if self.status == 'overdue':
-                # create fine only if not exists
-                if not hasattr(self, 'fine'):
-                    days_overdue = (timezone.now().date() - self.due_date).days
-                    if days_overdue < 0:
-                        days_overdue = 0
-                    amount = Decimal(days_overdue) * Decimal('10.00')
-                    Fine.objects.create(loan=self, member=self.member, fine_amount=amount, status='pending')
+                days_overdue = (timezone.now().date() - self.due_date).days
+                amount = Decimal(max(days_overdue, 0)) * Decimal('10.00')
+                Fine.objects.get_or_create(
+                    loan=self,
+                    defaults={
+                        'member': self.member,
+                        'fine_amount': amount,
+                        'status': 'pending',
+                    },
+                )
+
+        update_member_membership_status(self.member)
 
     def __str__(self):
         return f'Loan #{self.pk}: {self.copy} to {self.member}'
@@ -294,7 +335,7 @@ class Fine(models.Model):
     loan = models.OneToOneField(Loan, on_delete=models.CASCADE, related_name='fine')
     member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='fines')
     fine_amount = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.00'))])
-    issue_date = models.DateField(default=timezone.now)
+    issue_date = models.DateField(default=get_today_date)
     paid_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=FINE_STATUS, default='pending')
 
@@ -317,7 +358,6 @@ class Fine(models.Model):
             update_member_membership_status(self.member)
 
     def save(self, *args, **kwargs):
-        creating = self._state.adding
         super().save(*args, **kwargs)
         # after creation / update, enforce membership status
         update_member_membership_status(self.member)
@@ -391,60 +431,3 @@ def update_member_membership_status(member: Member):
     if new_status != member.membership_status:
         member.membership_status = new_status
         member.save(update_fields=['membership_status'])
-
-
-@receiver(pre_save, sender=Loan)
-def loan_pre_save(sender, instance: Loan, **kwargs):
-    """
-    Before saving a loan - auto-update status to overdue if due_date < today and still active.
-    """
-    if instance.pk is None:
-        # new loan - nothing to auto-change yet
-        return
-
-    try:
-        prev = Loan.objects.get(pk=instance.pk)
-    except Loan.DoesNotExist:
-        return
-
-    # If previously active and due_date passed, mark overdue
-    if instance.status == 'active':
-        today = timezone.now().date()
-        if instance.due_date < today:
-            instance.status = 'overdue'
-
-
-@receiver(post_save, sender=Loan)
-def loan_post_save(sender, instance: Loan, created, **kwargs):
-    """
-    After saving a loan:
-    - ensure book copy status aligns with loan
-    - create fine when loan becomes overdue (if not exists)
-    - update member status
-    """
-    # ensure copy status
-    if instance.status == 'active' and instance.copy.status != 'borrowed':
-        instance.copy.status = 'borrowed'
-        instance.copy.save(update_fields=['status'])
-
-    if instance.status == 'returned' and instance.copy.status != 'available':
-        instance.copy.status = 'available'
-        instance.copy.save(update_fields=['status'])
-
-    # if overdue and fine not exists -> create fine
-    if instance.status == 'overdue':
-        if not hasattr(instance, 'fine'):
-            days_overdue = (timezone.now().date() - instance.due_date).days
-            if days_overdue < 0:
-                days_overdue = 0
-            amount = Decimal(days_overdue) * Decimal('10.00')
-            Fine.objects.create(loan=instance, member=instance.member, fine_amount=amount, status='pending')
-
-    # update member membership (suspend/restore)
-    update_member_membership_status(instance.member)
-
-
-@receiver(post_save, sender=Fine)
-def fine_post_save(sender, instance: Fine, created, **kwargs):
-    # Whenever a fine changes, update member status
-    update_member_membership_status(instance.member)

@@ -33,7 +33,7 @@ export default function BookAutocomplete({ value, onChange, placeholder = "На�
     const fetchBooks = async () => {
       setLoading(true);
       try {
-        const res = await axios.get(`http://localhost:8000/api/books/?title=${encodeURIComponent(input)}`);
+        const res = await axios.get(`/books?title=${encodeURIComponent(input)}`);
         setSuggestions(res.data);
         setShowList(true);
       } catch (err) {

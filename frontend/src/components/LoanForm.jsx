@@ -11,14 +11,14 @@ export default function LoanForm() {
   const [message, setMessage] = useState('');
 
   // При выборе книги — загружаем доступные копии
-  const handleBookSelect = async (bookId, bookTitle) => {
+  const handleBookSelect = async (bookId) => {
     setSelectedBookId(bookId);
     setSelectedCopyId(null);
     setAvailableCopies([]);
     if (!bookId) return;
 
     try {
-      const res = await axios.get(`http://localhost:8000/api/copies/?book_id=${bookId}&status=available`);
+      const res = await axios.get(`/copies?book_id=${bookId}&status=available`);
       setAvailableCopies(res.data);
     } catch (err) {
       console.error("Ошибка загрузки копий", err);
@@ -33,18 +33,17 @@ export default function LoanForm() {
     }
 
     try {
-      await axios.post('http://localhost:8000/api/loans/', {
+      await axios.post('/loans', {
         copy: selectedCopyId,
         member: memberId,
-        issued_by_staff_id: 1 // или получать из сессии
       });
-      setMessage('✅ Книга выдана!');
+      setMessage('OK: Книга выдана');
       setSelectedBookId(null);
       setSelectedCopyId(null);
       setAvailableCopies([]);
       setMemberId('');
     } catch (err) {
-      setMessage('❌ Ошибка: ' + (err.response?.data?.error || 'не удалось выдать'));
+      setMessage('Ошибка: ' + (err.response?.data?.error || 'не удалось выдать'));
     }
   };
 
@@ -95,7 +94,7 @@ export default function LoanForm() {
 
         <button type="submit">Выдать книгу</button>
         {message && (
-          <p style={{ marginTop: '10px', color: message.startsWith('✅') ? 'green' : 'red' }}>
+          <p style={{ marginTop: '10px', color: message.startsWith('OK:') ? 'green' : 'red' }}>
             {message}
           </p>
         )}

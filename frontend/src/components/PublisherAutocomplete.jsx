@@ -1,11 +1,21 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
-export default function PublisherAutocomplete({ value, onChange, onNewPublisher }) {
+export default function PublisherAutocomplete({ value, selectedName, onChange, onNewPublisher }) {
   const [input, setInput] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [showList, setShowList] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!value) {
+      setInput('');
+      return;
+    }
+    if (selectedName) {
+      setInput(selectedName);
+    }
+  }, [value, selectedName]);
 
   useEffect(() => {
     if (!input.trim()) {
@@ -17,7 +27,7 @@ export default function PublisherAutocomplete({ value, onChange, onNewPublisher 
     const fetchPublishers = async () => {
       setLoading(true);
       try {
-        const res = await axios.get(`http://localhost:8000/api/publishers/?name=${encodeURIComponent(input)}`);
+        const res = await axios.get(`/publishers?name=${encodeURIComponent(input)}`);
         setSuggestions(res.data);
         setShowList(true);
       } catch (err) {

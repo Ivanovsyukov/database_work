@@ -7,7 +7,7 @@ from .views import (
     PopularBooksReport, MemberActivityReport, FinesSummaryReport
 )
 
-router = DefaultRouter()
+router = DefaultRouter(trailing_slash=False)
 router.register(r'authors', AuthorViewSet)
 router.register(r'publishers', PublisherViewSet)
 router.register(r'books', BookViewSet)

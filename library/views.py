@@ -21,9 +21,11 @@ from .serializers import (
 
 @api_view(["POST"])
 def login_view(request):
-    email = request.data.get("email")
+    email = (request.data.get("email") or "").strip()
+    if not email:
+        return Response({"error": "Email обязателен"}, status=400)
     try:
-        staff = Staff.objects.get(email=email)
+        staff = Staff.objects.get(email__iexact=email)
         # Сохраняем ID сотрудника в сессии
         request.session['staff_id'] = staff.id
         return Response({
@@ -53,6 +55,13 @@ class AuthorViewSet(viewsets.ModelViewSet):
 class PublisherViewSet(viewsets.ModelViewSet):
     queryset = Publisher.objects.all()
     serializer_class = PublisherSerializer
+
+    def get_queryset(self):
+        queryset = Publisher.objects.all()
+        name = self.request.query_params.get("name")
+        if name:
+            queryset = queryset.filter(name__icontains=name)
+        return queryset
 
 
 class BookViewSet(viewsets.ModelViewSet):
@@ -154,7 +163,7 @@ class LoanViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(loan)
         return Response(serializer.data, status=201)
 
-    @action(detail=True, methods=["put"])
+    @action(detail=True, methods=["put"], url_path="return")
     def return_book(self, request, pk=None):
         loan = self.get_object()
         if loan.status == 'returned':

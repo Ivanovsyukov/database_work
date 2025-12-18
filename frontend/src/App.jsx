@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
 import Login from './components/Login';
 
@@ -12,25 +12,26 @@ import ReservationList from './components/ReservationList';
 import FineManagement from './components/FineManagement';
 import BookManagement from './components/BookManagement';
 import CopyManagement from './components/CopyManagement';
+import AuthorManagement from './components/AuthorManagement';
+import LoanDashboard from './components/LoanDashboard';
+import Reports from './components/Reports';
 
 export default function App(){
-  const [staff, setStaff] = useState(null);
-  const [activeTab, setActiveTab] = useState('books');
-
-  useEffect(() => {
+  const [staff, setStaff] = useState(() => {
     const saved = localStorage.getItem('staff');
-    if (saved) {
-      try {
-        setStaff(JSON.parse(saved));
-      } catch (e) {
-        localStorage.removeItem('staff');
-      }
+    if (!saved) return null;
+    try {
+      return JSON.parse(saved);
+    } catch {
+      localStorage.removeItem('staff');
+      return null;
     }
-  }, []);
+  });
+  const [activeTab, setActiveTab] = useState('books');
 
   const handleLogout = async () => {
     try {
-      await axios.post('http://localhost:8000/api/auth/logout');
+      await axios.post('/auth/logout');
     } catch (err) {
       console.warn('Ошибка при выходе:', err);
     }
@@ -44,6 +45,7 @@ export default function App(){
 
   // Определяем, имеет ли доступ (библиотекарь или админ)
   const canManage = staff.role === 'librarian' || staff.role === 'admin';
+  const isAdmin = staff.role === 'admin';
 
   return (
     <div style={{ padding: '20px', fontFamily: 'sans-serif', position: 'relative' }}>
@@ -101,6 +103,12 @@ export default function App(){
               Зарегистрировать читателя
             </button>
             <button
+              onClick={() => setActiveTab('authors')}
+              style={tabStyle(activeTab === 'authors')}
+            >
+              Авторы
+            </button>
+            <button
               onClick={() => setActiveTab('reservations')}
               style={tabStyle(activeTab === 'reservations')}
             >
@@ -124,22 +132,39 @@ export default function App(){
             >
               Добавить копию
             </button>
+            <button
+              onClick={() => setActiveTab('loan-dashboard')}
+              style={tabStyle(activeTab === 'loan-dashboard')}
+            >
+              Выдачи
+            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('reports')}
+                style={tabStyle(activeTab === 'reports')}
+              >
+                Отчёты
+              </button>
+            )}
           </>
         )}
       </div>
 
       {/* Основные просмотры */}
       {activeTab === 'books' && <BookList />}
-      {activeTab === 'members' && <MemberList />}
+      {activeTab === 'members' && <MemberList canManage={canManage} />}
 
       {/* Функции для библиотекарей */}
       {canManage && activeTab === 'loan' && <LoanForm />}
       {canManage && activeTab === 'return' && <ReturnForm />}
       {canManage && activeTab === 'register-member' && <MemberRegistration />}
+      {canManage && activeTab === 'authors' && <AuthorManagement />}
       {canManage && activeTab === 'reservations' && <ReservationList />}
       {canManage && activeTab === 'fines' && <FineManagement />}
       {canManage && activeTab === 'book-management' && <BookManagement />}
       {canManage && activeTab === 'copy-management' && <CopyManagement />}
+      {canManage && activeTab === 'loan-dashboard' && <LoanDashboard />}
+      {isAdmin && activeTab === 'reports' && <Reports />}
     </div>
   );
 }

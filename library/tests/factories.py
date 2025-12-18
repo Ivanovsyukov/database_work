@@ -1,6 +1,6 @@
 import factory
 from factory.django import DjangoModelFactory
-from library.models import Author, Publisher, Book, BookCopy, Member
+from library.models import Author, Publisher, Book, BookCopy, Member, Staff
 
 
 class PublisherFactory(DjangoModelFactory):
@@ -13,7 +13,7 @@ class AuthorFactory(DjangoModelFactory):
     class Meta:
         model = Author
     first_name = "John"
-    last_name = factory.Sequence(lambda n: f"Doe{n}")
+    last_name = "Doe"
 
 
 class BookFactory(DjangoModelFactory):
@@ -42,6 +42,16 @@ class MemberFactory(DjangoModelFactory):
     first_name = "Alice"
     last_name = "Smith"
     email = factory.Sequence(lambda n: f"alice{n}@example.com")
+
+
+class StaffFactory(DjangoModelFactory):
+    class Meta:
+        model = Staff
+
+    first_name = "Bob"
+    last_name = "Admin"
+    email = factory.Sequence(lambda n: f"staff{n}@example.com")
+    role = "librarian"
 
 
 class BookCopyFactory(DjangoModelFactory):
