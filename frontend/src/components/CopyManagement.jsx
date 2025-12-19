@@ -8,7 +8,7 @@ export default function CopyManagement() {
   const [barcode, setBarcode] = useState('');
   const [message, setMessage] = useState('');
 
-  const handleBookSelect = (bookId, bookTitle) => {
+  const handleBookSelect = (bookId) => {
     setSelectedBookId(bookId);
   };
 
@@ -20,15 +20,15 @@ export default function CopyManagement() {
     }
 
     try {
-      await axios.post('http://localhost:8000/api/copies/', {
+      await axios.post('/copies', {
         book: selectedBookId,
         barcode: barcode,
       });
-      setMessage('✅ Копия добавлена!');
+      setMessage('OK: Копия добавлена');
       setSelectedBookId(null);
       setBarcode('');
     } catch (err) {
-      setMessage('❌ Ошибка: ' + (err.response?.data?.barcode || 'сервер'));
+      setMessage('Ошибка: ' + (err.response?.data?.barcode || 'сервер'));
     }
   };
 
@@ -58,7 +58,7 @@ export default function CopyManagement() {
         </div>
         <button type="submit">Добавить копию</button>
         {message && (
-          <p style={{ marginTop: '10px', color: message.startsWith('✅') ? 'green' : 'red' }}>
+          <p style={{ marginTop: '10px', color: message.startsWith('OK:') ? 'green' : 'red' }}>
             {message}
           </p>
         )}

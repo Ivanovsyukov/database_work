@@ -7,7 +7,7 @@ export default function ReturnForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.put(`http://localhost:8000/api/loans/${loanId}/return_book/`);
+      await axios.put(`/loans/${loanId}/return`);
       alert('Книга успешно возвращена!');
       setLoanId('');
     } catch (err) {

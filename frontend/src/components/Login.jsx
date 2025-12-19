@@ -7,11 +7,17 @@ export default function Login({ onLogin }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post('http://localhost:8000/api/auth/login', { email });
+      const normalizedEmail = email.trim().toLowerCase();
+      const res = await axios.post('/auth/login', { email: normalizedEmail });
       localStorage.setItem('staff', JSON.stringify(res.data));
       onLogin(res.data);
     } catch (err) {
-      alert('Сотрудник не найден: ' + (err.response?.data?.error || 'ошибка'));
+      const serverError = err.response?.data?.error;
+      if (serverError) {
+        alert('Ошибка входа: ' + serverError);
+        return;
+      }
+      alert('Не удалось подключиться к бэкенду (проверь `python manage.py runserver`)');
     }
   };
 

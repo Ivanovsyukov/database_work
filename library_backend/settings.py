@@ -82,7 +82,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'library_db',      # название базы
         'USER': 'postgres',        # пользователь PostgreSQL
-        'PASSWORD': 'bo2005ok',    # пароль от него
+        'PASSWORD': '',            # пароль от него
         'HOST': 'localhost',       # адрес (или имя контейнера)
         'PORT': '5432',            # порт PostgreSQL
     }
@@ -133,3 +133,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # порт Vite
 ]
+
+CORS_ALLOW_CREDENTIALS = True
+
+# DRF по умолчанию включает SessionAuthentication, которая требует CSRF для
+# unsafe-запросов, если в браузере уже есть session (например, после входа в /admin).
+# Мы используем собственную сессионную авторизацию через request.session['staff_id'],
+# поэтому отключаем DRF-auth, чтобы API работал из фронтенда без CSRF-токена.
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
+}

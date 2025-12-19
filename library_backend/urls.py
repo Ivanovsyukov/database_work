@@ -19,5 +19,8 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # README endpoints (без префикса /api)
+    path('', include('library.urls')),
+    # Backward-compatible prefix (можно удалить позже)
     path('api/', include('library.urls')),
 ]

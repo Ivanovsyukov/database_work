@@ -17,7 +17,7 @@ export default function MemberRegistration() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:8000/api/members/', formData);
+      await axios.post('/members', formData);
       alert('Читатель успешно зарегистрирован!');
       setFormData({ first_name: '', last_name: '', email: '', phone: '', address: '' });
     } catch (err) {
