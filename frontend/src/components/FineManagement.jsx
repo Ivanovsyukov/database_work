@@ -1,4 +1,3 @@
-// frontend/src/components/FineManagement.jsx
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
