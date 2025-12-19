@@ -1,17 +1,22 @@
+# Импорты для работы с датами, проверками и базой данных
 from decimal import Decimal
 from datetime import date
 
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator, MinValueValidator, EmailValidator
-from django.db import models, transaction
+from django.db import models, transaction  # transaction — для группировки операций (всё или ничего)
 from django.db.models import Q, Sum, F
 from django.db.models.functions import ExtractYear, Now
 from django.utils import timezone
 
+# Вспомогательная функция: возвращает сегодняшнюю дату (с учётом временной зоны)
 def get_today_date():
     return timezone.now().date()
 
-# --- Constants / Choices ---
+
+# --- Константы: статусы и роли ---
+# Используем кортежи (значение в БД, человекочитаемое название) — так Django и ожидает
+
 BOOK_COPY_STATUSES = (
     ('available', 'Available'),
     ('borrowed', 'Borrowed'),
@@ -47,45 +52,54 @@ STAFF_ROLES = (
     ('admin', 'Admin'),
 )
 
-# --- Validators ---
-no_digits_validator = RegexValidator(regex=r'^\D+$', message='Field cannot contain digits.')
-not_empty_validator = RegexValidator(regex=r'.+', message='Field cannot be empty.')
-isbn_validator = RegexValidator(regex=r'^\d{13}$', message='ISBN must be exactly 13 digits.')
+
+# --- Валидаторы полей ---
+# Чтобы не дублировать код, вынесли общие проверки сюда
+
+no_digits_validator = RegexValidator(
+    regex=r'^\D+$',  # только не-цифры
+    message='Field cannot contain digits.'
+)
+not_empty_validator = RegexValidator(
+    regex=r'.+',  # хотя бы один символ
+    message='Field cannot be empty.'
+)
+isbn_validator = RegexValidator(
+    regex=r'^\d{13}$',  # ровно 13 цифр
+    message='ISBN must be exactly 13 digits.'
+)
 
 
-# --- Models ---
+# --- Модели данных ---
 
 class Author(models.Model):
+    """Автор книги"""
     first_name = models.CharField(max_length=50, validators=[no_digits_validator])
     last_name = models.CharField(max_length=50, validators=[no_digits_validator])
     birth_date = models.DateField(null=True, blank=True)
     bio = models.TextField(null=True, blank=True)
 
     class Meta:
-        db_table = "authors"
+        db_table = "authors"  # название таблицы в БД
+        # Проверки на уровне БД
         constraints = [
             models.CheckConstraint(condition=~models.Q(first_name=''), name='author_first_name_not_empty'),
             models.CheckConstraint(condition=~models.Q(last_name=''), name='author_last_name_not_empty'),
-            models.CheckConstraint(
-                condition=~models.Q(first_name__regex=r'[0-9]'),
-                name='author_first_name_no_digits',
-            ),
-            models.CheckConstraint(
-                condition=~models.Q(last_name__regex=r'[0-9]'),
-                name='author_last_name_no_digits',
-            ),
+            models.CheckConstraint(condition=~models.Q(first_name__regex=r'[0-9]'), name='author_first_name_no_digits'),
+            models.CheckConstraint(condition=~models.Q(last_name__regex=r'[0-9]'), name='author_last_name_no_digits'),
             models.CheckConstraint(
                 condition=(Q(birth_date__gt=date(1500, 1, 1)) | Q(birth_date__isnull=True)),
                 name='author_birth_date_valid'
             ),
         ]
-        ordering = ['last_name', 'first_name']
+        ordering = ['last_name', 'first_name']  # сортировка по умолчанию
 
     def __str__(self):
         return f'{self.first_name} {self.last_name}'
 
 
 class Publisher(models.Model):
+    """Издательство"""
     name = models.CharField(max_length=100, unique=True, validators=[not_empty_validator])
     address = models.TextField(null=True, blank=True)
 
@@ -100,6 +114,7 @@ class Publisher(models.Model):
 
 
 class Book(models.Model):
+    """Книга"""
     title = models.CharField(max_length=255, validators=[not_empty_validator])
     isbn = models.CharField(max_length=13, unique=True, validators=[isbn_validator])
     publication_year = models.IntegerField()
@@ -116,15 +131,12 @@ class Book(models.Model):
                 condition=Q(publication_year__lte=ExtractYear(Now())),
                 name='book_publication_year_max_current',
             ),
-            models.CheckConstraint(
-                condition=Q(isbn__regex=r'^[0-9]{13}$'),
-                name='book_isbn_13_digits',
-            ),
+            models.CheckConstraint(condition=Q(isbn__regex=r'^[0-9]{13}$'), name='book_isbn_13_digits'),
         ]
         ordering = ['title']
 
     def clean(self):
-        # publication_year <= current year
+        # Дополнительная проверка в Python: год не может быть в будущем
         current_year = timezone.now().year
         if self.publication_year is not None and self.publication_year > current_year:
             raise ValidationError({'publication_year': f'Publication year cannot be in the future ({current_year}).'})
@@ -134,24 +146,23 @@ class Book(models.Model):
 
 
 class BookAuthor(models.Model):
+    """Промежуточная модель для связи многие-ко-многим между Book и Author"""
     book = models.ForeignKey(Book, on_delete=models.CASCADE)
     author = models.ForeignKey(Author, on_delete=models.CASCADE)
 
     class Meta:
         db_table = "book_authors"
-        unique_together = ('book', 'author')
-        # primary key is implicit (id), but unique_together enforces pair uniqueness
-        verbose_name = 'Book-Author relation'
-        verbose_name_plural = 'Book-Author relations'
+        unique_together = ('book', 'author')  # одна пара — одна запись
 
     def __str__(self):
         return f'{self.book} — {self.author}'
 
 
 class BookCopy(models.Model):
+    """Физическая копия книги (с штрихкодом и статусом)"""
     book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name='copies')
     barcode = models.CharField(max_length=20, unique=True, validators=[not_empty_validator])
-    acquisition_date = models.DateField(default=get_today_date)
+    acquisition_date = models.DateField(default=get_today_date)  # дата поступления в фонд
     status = models.CharField(max_length=20, choices=BOOK_COPY_STATUSES, default='available')
 
     class Meta:
@@ -164,7 +175,9 @@ class BookCopy(models.Model):
     def __str__(self):
         return f'Copy {self.barcode} of "{self.book.title}"'
 
+
 class Member(models.Model):
+    """Читатель библиотеки"""
     first_name = models.CharField(max_length=50, validators=[no_digits_validator])
     last_name = models.CharField(max_length=50, validators=[no_digits_validator])
     email = models.EmailField(unique=True, validators=[EmailValidator()])
@@ -178,18 +191,9 @@ class Member(models.Model):
         constraints = [
             models.CheckConstraint(condition=~models.Q(first_name=''), name='member_first_name_not_empty'),
             models.CheckConstraint(condition=~models.Q(last_name=''), name='member_last_name_not_empty'),
-            models.CheckConstraint(
-                condition=~models.Q(first_name__regex=r'[0-9]'),
-                name='member_first_name_no_digits',
-            ),
-            models.CheckConstraint(
-                condition=~models.Q(last_name__regex=r'[0-9]'),
-                name='member_last_name_no_digits',
-            ),
-            models.CheckConstraint(
-                condition=Q(email__contains='@'),
-                name='member_email_contains_at',
-            ),
+            models.CheckConstraint(condition=~models.Q(first_name__regex=r'[0-9]'), name='member_first_name_no_digits'),
+            models.CheckConstraint(condition=~models.Q(last_name__regex=r'[0-9]'), name='member_last_name_no_digits'),
+            models.CheckConstraint(condition=Q(email__contains='@'), name='member_email_contains_at'),
             models.CheckConstraint(condition=Q(membership_status__in=[s[0] for s in MEMBER_STATUS]), name='member_status_valid'),
         ]
         ordering = ['last_name', 'first_name']
@@ -197,18 +201,23 @@ class Member(models.Model):
     def __str__(self):
         return f'{self.first_name} {self.last_name}'
 
+    # Вспомогательные методы для работы с бизнес-логикой
     def active_loans_count(self):
+        """Сколько активных выдач у читателя"""
         return self.loans.filter(status='active').count()
 
     def overdue_loans_count(self):
+        """Сколько просроченных выдач"""
         return self.loans.filter(status='overdue').count()
 
     def unpaid_fines_total(self):
+        """Сумма всех неоплаченных штрафов"""
         res = self.fines.filter(status='pending').aggregate(total=Sum('fine_amount'))
         return res['total'] or Decimal('0.00')
 
 
 class Staff(models.Model):
+    """Сотрудник библиотеки (библиотекарь или админ)"""
     first_name = models.CharField(max_length=50, validators=[no_digits_validator])
     last_name = models.CharField(max_length=50, validators=[no_digits_validator])
     email = models.EmailField(unique=True, validators=[EmailValidator()])
@@ -219,18 +228,9 @@ class Staff(models.Model):
         constraints = [
             models.CheckConstraint(condition=~models.Q(first_name=''), name='staff_first_name_not_empty'),
             models.CheckConstraint(condition=~models.Q(last_name=''), name='staff_last_name_not_empty'),
-            models.CheckConstraint(
-                condition=~models.Q(first_name__regex=r'[0-9]'),
-                name='staff_first_name_no_digits',
-            ),
-            models.CheckConstraint(
-                condition=~models.Q(last_name__regex=r'[0-9]'),
-                name='staff_last_name_no_digits',
-            ),
-            models.CheckConstraint(
-                condition=Q(email__contains='@'),
-                name='staff_email_contains_at',
-            ),
+            models.CheckConstraint(condition=~models.Q(first_name__regex=r'[0-9]'), name='staff_first_name_no_digits'),
+            models.CheckConstraint(condition=~models.Q(last_name__regex=r'[0-9]'), name='staff_last_name_no_digits'),
+            models.CheckConstraint(condition=Q(email__contains='@'), name='staff_email_contains_at'),
             models.CheckConstraint(condition=Q(role__in=[r[0] for r in STAFF_ROLES]), name='staff_role_valid'),
         ]
         ordering = ['last_name', 'first_name']
@@ -240,11 +240,12 @@ class Staff(models.Model):
 
 
 class Loan(models.Model):
+    """Операция выдачи книги читателю"""
     copy = models.ForeignKey(BookCopy, on_delete=models.RESTRICT, related_name='loans')
     member = models.ForeignKey(Member, on_delete=models.RESTRICT, related_name='loans')
     loan_date = models.DateField(default=get_today_date)
-    due_date = models.DateField()
-    return_date = models.DateField(null=True, blank=True)
+    due_date = models.DateField()  # когда надо вернуть
+    return_date = models.DateField(null=True, blank=True)  # когда реально вернули
     status = models.CharField(max_length=20, choices=LOAN_STATUS, default='active')
 
     class Meta:
@@ -260,62 +261,55 @@ class Loan(models.Model):
         ordering = ['-loan_date']
 
     def clean(self):
+        """Проверки при создании/изменении выдачи"""
         errors = {}
-        # due_date must be after loan_date
+
         if self.due_date and self.loan_date and self.due_date <= self.loan_date:
             errors['due_date'] = 'Due date must be after loan date.'
 
-        # return_date must be None or >= loan_date
         if self.return_date and self.return_date < self.loan_date:
             errors['return_date'] = 'Return date cannot be before loan date.'
 
-        # copy must be available when creating an active loan
+        # При создании новой активной выдачи:
         if not self.pk and self.status == 'active':
             if self.copy.status != 'available':
                 errors['copy'] = 'Cannot loan a copy that is not available.'
-
             if self.member.membership_status != 'active':
                 errors['member'] = 'Member is not active and cannot borrow books.'
-
-            # active loans limit
-            active_loans = self.member.loans.filter(status='active').count()
-            if active_loans >= 5:
-                errors['member'] = f'Member already has {active_loans} active loans (limit 5).'
-
-        # prevent creating loan if copy is lost/under maintenance etc
-        if self.copy and self.copy.status not in dict(BOOK_COPY_STATUSES).keys():
-            errors['copy'] = 'Invalid copy status.'
+            if self.member.active_loans_count() >= 5:
+                errors['member'] = f'Member already has {self.member.active_loans_count()} active loans (limit 5).'
 
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        """Сохранение с учётом бизнес-правил"""
         self.full_clean()
 
-        # Auto-switch to overdue when saving an existing active loan past due date.
+        # Если выдача активна и просрочена — меняем статус на 'overdue'
         if self.pk and self.status == 'active' and self.due_date and self.due_date < timezone.now().date():
             self.status = 'overdue'
 
-        with transaction.atomic():
-            super().save(*args, **kwargs)  # save loan first
+        with transaction.atomic():  # Гарантируем, что всё пройдёт или ничего
+            super().save(*args, **kwargs)
 
-            # Keep book copy status consistent with loan status.
-            if self.status in {'active', 'overdue'} and self.copy.status != 'borrowed':
-                self.copy.status = 'borrowed'
-                self.copy.save(update_fields=['status'])
-
-            if self.status == 'returned':
+            # Синхронизируем статус копии книги
+            if self.status in {'active', 'overdue'}:
+                if self.copy.status != 'borrowed':
+                    self.copy.status = 'borrowed'
+                    self.copy.save(update_fields=['status'])
+            elif self.status == 'returned':
                 if self.copy.status != 'available':
                     self.copy.status = 'available'
                     self.copy.save(update_fields=['status'])
-
                 if not self.return_date:
                     self.return_date = timezone.now().date()
                     super().save(update_fields=['return_date'])
 
+            # При переходе в 'overdue' — создаём штраф
             if self.status == 'overdue':
                 days_overdue = (timezone.now().date() - self.due_date).days
-                amount = Decimal(max(days_overdue, 0)) * Decimal('10.00')
+                amount = Decimal(max(days_overdue, 0)) * Decimal('10.00')  # 10 руб/день
                 Fine.objects.get_or_create(
                     loan=self,
                     defaults={
@@ -325,6 +319,7 @@ class Loan(models.Model):
                     },
                 )
 
+        # После сохранения — проверяем и, возможно, блокируем читателя
         update_member_membership_status(self.member)
 
     def __str__(self):
@@ -332,6 +327,7 @@ class Loan(models.Model):
 
 
 class Fine(models.Model):
+    """Штраф за просрочку"""
     loan = models.OneToOneField(Loan, on_delete=models.CASCADE, related_name='fine')
     member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='fines')
     fine_amount = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.00'))])
@@ -348,7 +344,7 @@ class Fine(models.Model):
         ordering = ['-issue_date']
 
     def pay(self, paid_date=None):
-        """Mark fine as paid and update member status accordingly."""
+        """Оплата штрафа — переводит в статус 'paid' и обновляет статус читателя"""
         with transaction.atomic():
             if self.status == 'paid':
                 return
@@ -359,18 +355,18 @@ class Fine(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        # after creation / update, enforce membership status
-        update_member_membership_status(self.member)
+        update_member_membership_status(self.member)  # при любом изменении — проверяем статус
 
     def __str__(self):
         return f'Fine #{self.pk} for {self.member} — {self.fine_amount}'
 
 
 class Reservation(models.Model):
+    """Бронирование книги"""
     book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name='reservations')
     member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='reservations')
     reservation_date = models.DateTimeField(default=timezone.now)
-    expiry_date = models.DateField()
+    expiry_date = models.DateField()  # когда бронь "сгорает"
     status = models.CharField(max_length=20, choices=RESERVATION_STATUS, default='active')
 
     class Meta:
@@ -382,11 +378,10 @@ class Reservation(models.Model):
 
     def clean(self):
         errors = {}
-        # expiry_date > reservation_date.date()
         if self.expiry_date and self.reservation_date and self.expiry_date <= self.reservation_date.date():
             errors['expiry_date'] = 'Expiry date must be after reservation date.'
 
-        # Prevent duplicate active reservation for same book & member
+        # Нельзя бронировать одну и ту же книгу дважды
         if self.status == 'active':
             qs = Reservation.objects.filter(book=self.book, member=self.member, status='active')
             if self.pk:
@@ -406,27 +401,25 @@ class Reservation(models.Model):
 
 
 # ----------------------------
-# Helper functions and signals
+# Вспомогательные функции
 # ----------------------------
 
 def update_member_membership_status(member: Member):
     """
-    Apply automatic suspension/activation rules:
-    - If unpaid fines total > 100 -> suspended
-    - If overdue loans > 3 -> suspended
-    - If no unpaid fines and overdue <= 3 and membership was suspended due to fines/overdue -> set active
+    Автоматически обновляет статус читателя:
+    - Блокирует, если штрафов > 100 руб или просроченных книг > 3.
+    - Разблокирует, если всё в порядке и статус был 'suspended' (но не 'expired').
     """
     unpaid_total = member.unpaid_fines_total()
     overdue_count = member.overdue_loans_count()
 
-    # Determine new status
     new_status = member.membership_status
+
     if unpaid_total > Decimal('100.00') or overdue_count > 3:
         new_status = 'suspended'
-    else:
-        # if not expired, restore to active
-        if member.membership_status == 'suspended':
-            new_status = 'active'
+    elif member.membership_status == 'suspended':
+        # Если причины блокировки исчезли — восстанавливаем
+        new_status = 'active'
 
     if new_status != member.membership_status:
         member.membership_status = new_status

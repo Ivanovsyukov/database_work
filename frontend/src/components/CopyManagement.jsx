@@ -1,4 +1,3 @@
-// frontend/src/components/CopyManagement.jsx
 import { useState } from 'react';
 import axios from 'axios';
 import BookAutocomplete from './BookAutocomplete';
