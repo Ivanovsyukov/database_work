@@ -12,14 +12,14 @@ export default function Reports() {
     setLoading(true);
     setMessage('');
     try {
-      const [popularRes, activityRes, finesRes] = await Promise.all([
+      const finesRes = await axios.get('/reports/fines-summary');
+      setFinesSummary(finesRes.data);
+      const [popularRes, activityRes] = await Promise.all([
         axios.get('/reports/popular-books'),
         axios.get('/reports/member-activity'),
-        axios.get('/reports/fines-summary'),
       ]);
       setPopularBooks(popularRes.data);
       setMemberActivity(activityRes.data);
-      setFinesSummary(finesRes.data);
     } catch (err) {
       setMessage('Ошибка загрузки отчётов: ' + (err.response?.data?.detail || 'сервер'));
     } finally {
@@ -114,4 +114,3 @@ export default function Reports() {
     </div>
   );
 }
-
