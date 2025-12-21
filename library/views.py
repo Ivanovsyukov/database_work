@@ -144,6 +144,15 @@ class MemberViewSet(viewsets.ModelViewSet):
     """CRUD для читателей."""
     queryset = Member.objects.all()
     serializer_class = MemberSerializer
+    
+    def get_queryset(self):
+        queryset = Member.objects.all()
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(last_name__icontains=search) | Q(first_name__icontains=search)
+            )
+        return queryset
 
 
 class StaffViewSet(viewsets.ModelViewSet):

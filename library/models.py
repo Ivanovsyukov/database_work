@@ -305,6 +305,7 @@ class Loan(models.Model):
                 if self.copy.status != 'available':
                     self.copy.status = 'available'
                     self.copy.save(update_fields=['status'])
+                    notify_first_reservation(self.copy)
                 if not self.return_date:
                     self.return_date = timezone.now().date()
                     super().save(update_fields=['return_date'])
@@ -330,6 +331,13 @@ class Loan(models.Model):
 
         # После сохранения — проверяем и, возможно, блокируем читателя
         update_member_membership_status(self.member)
+
+        if self.status == 'active':
+            Reservation.objects.filter(
+                book=self.copy.book,
+                member=self.member,
+                status='active'
+            ).update(status='fulfilled')
 
     def __str__(self):
         return f'Loan #{self.pk}: {self.copy} to {self.member}'
@@ -434,38 +442,20 @@ def update_member_membership_status(member: Member):
         member.membership_status = new_status
         member.save(update_fields=['membership_status'])
 
-@receiver(post_save, sender=BookCopy)
-def handle_book_copy_availability(sender, instance, created, **kwargs):
-    """
-    Отправляет email, когда копия становится available,
-    и есть активные бронирования на эту книгу.
-    """
-    # Пропускаем создание новой копии
-    if created:
-        return
+def notify_first_reservation(book_copy):
+    """Отправляет email первому в очереди бронировании для book_copy.book"""
+    reservation = Reservation.objects.filter(
+        book=book_copy.book,
+        status='active'
+    ).order_by('reservation_date').first()
 
-    # Проверяем, что статус изменился на 'available'
-    # Для этого нужно сравнить с предыдущим значением
-    try:
-        old_copy = BookCopy.objects.get(pk=instance.pk)
-        if old_copy.status != 'available' and instance.status == 'available':
-            # Есть активные бронирования?
-            reservation = Reservation.objects.filter(
-                book=instance.book,
-                status='active'
-            ).order_by('reservation_date').first()
-
-            if reservation:
-                member = reservation.member
-                try:
-                    send_mail(
-                        subject='Ваша бронь готова!',
-                        message=f'Книга "{instance.book.title}" доступна для выдачи.',
-                        from_email=settings.DEFAULT_FROM_EMAIL,
-                        recipient_list=[member.email],
-                        fail_silently=False,
-                    )
-                except Exception as e:
-                    print(f"Ошибка отправки email: {e}")
-    except BookCopy.DoesNotExist:
-        pass  # Копия только что создана — игнорируем
+    if reservation:  # ← УБРАЛИ проверку notification_sent_at
+        try:
+            send_mail(
+                subject='Ваша бронь готова!',
+                message=f'Книга "{book_copy.book.title}" доступна для выдачи.',
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[reservation.member.email],
+            )
+        except Exception as e:
+            print(f"Ошибка email: {e}")

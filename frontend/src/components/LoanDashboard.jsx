@@ -44,15 +44,15 @@ export default function LoanDashboard() {
   };
 
   const renderLoansTable = (loans) => (
-    <table border="1" cellPadding="8" style={{ marginTop: '10px' }}>
+    <table border="1" cellPadding="8" style={{ marginTop: '10px', width: '100%', borderCollapse: 'collapse' }}>
       <thead>
         <tr>
           <th>ID</th>
-          <th>Copy ID</th>
-          <th>Member ID</th>
-          <th>Loan date</th>
-          <th>Due date</th>
-          <th>Status</th>
+          <th>Книга</th>
+          <th>Читатель</th>
+          <th>Дата выдачи</th>
+          <th>Срок возврата</th>
+          <th>Статус</th>
           <th>Действие</th>
         </tr>
       </thead>
@@ -60,8 +60,8 @@ export default function LoanDashboard() {
         {loans.map((l) => (
           <tr key={l.id}>
             <td>{l.id}</td>
-            <td>{l.copy}</td>
-            <td>{l.member}</td>
+            <td>{l.book_title}</td>
+            <td>{l.member_last_name} {l.member_first_name}</td>
             <td>{l.loan_date}</td>
             <td>{l.due_date}</td>
             <td>{l.status}</td>
@@ -70,6 +70,7 @@ export default function LoanDashboard() {
                 <button
                   onClick={() => handleReturn(l.id)}
                   disabled={returningId === l.id}
+                  style={{ padding: '4px 8px', background: '#007bff', color: 'white', border: 'none', borderRadius: '4px' }}
                 >
                   {returningId === l.id ? '...' : 'Вернуть'}
                 </button>
@@ -84,7 +85,7 @@ export default function LoanDashboard() {
   return (
     <div>
       <h2>Выдачи</h2>
-      <button onClick={fetchLoans} style={{ padding: '6px 10px' }}>
+      <button onClick={fetchLoans} style={{ padding: '6px 10px', marginBottom: '10px' }}>
         Обновить
       </button>
 
@@ -108,4 +109,3 @@ export default function LoanDashboard() {
     </div>
   );
 }
-

@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import BookAutocomplete from './BookAutocomplete';
+import MemberAutocomplete from './MemberAutocomplete'; 
 
 export default function LoanForm() {
   const [selectedBookId, setSelectedBookId] = useState(null);
   const [availableCopies, setAvailableCopies] = useState([]);
   const [selectedCopyId, setSelectedCopyId] = useState(null);
-  const [memberId, setMemberId] = useState('');
   const [message, setMessage] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [selectedMemberId, setSelectedMemberId] = useState(null);
 
   // При монтировании компонента — установи дату по умолчанию (+14 дней)
   useEffect(() => {
@@ -34,15 +35,15 @@ export default function LoanForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedCopyId || !memberId) {
-      setMessage('Выберите копию и укажите ID читателя');
+    if (!selectedCopyId || !selectedMemberId) { // ← проверка по ID
+      setMessage('Выберите копию и читателя');
       return;
     }
 
     try {
       await axios.post('/loans', {
         copy: selectedCopyId,
-        member: memberId,
+        member: selectedMemberId,
         due_date: dueDate,
       });
       setMessage('OK: Книга выдана');
@@ -50,7 +51,7 @@ export default function LoanForm() {
       setSelectedBookId(null);
       setSelectedCopyId(null);
       setAvailableCopies([]);
-      setMemberId('');
+      setSelectedMemberId(null);
       // Обновляем дату по умолчанию для следующей выдачи
       const today = new Date();
       const defaultDue = new Date(today);
@@ -94,24 +95,13 @@ export default function LoanForm() {
         )}
 
         <div style={{ marginBottom: '12px' }}>
-          <label>
-            ID читателя:
-            <input
-              type="number"
-              value={memberId}
-              onChange={(e) => setMemberId(e.target.value)}
-              style={{ width: '100%', padding: '6px', marginTop: '4px' }}
-              required
-            />
-          </label>
+          <label>Читатель:</label>
+          <MemberAutocomplete
+            value={selectedMemberId}
+            onChange={(memberId) => setSelectedMemberId(memberId)}
+            placeholder="Введите ФИО читателя..."
+          />
         </div>
-
-        <button type="submit">Выдать книгу</button>
-        {message && (
-          <p style={{ marginTop: '10px', color: message.startsWith('OK:') ? 'green' : 'red' }}>
-            {message}
-          </p>
-        )}
 
         <div style={{ marginBottom: '12px' }}>
           <label>
@@ -125,6 +115,13 @@ export default function LoanForm() {
             />
           </label>
         </div>
+
+        <button type="submit">Выдать книгу</button>
+        {message && (
+          <p style={{ marginTop: '10px', color: message.startsWith('OK:') ? 'green' : 'red' }}>
+            {message}
+          </p>
+        )}
       </form>
     </div>
   );

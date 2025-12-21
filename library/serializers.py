@@ -165,10 +165,16 @@ class LoanSerializer(serializers.ModelSerializer):
         - проверку статуса читателя,
         - проверку доступности копии.
     """
+    book_title = serializers.CharField(source='copy.book.title', read_only=True)
+    member_first_name = serializers.CharField(source='member.first_name', read_only=True)
+    member_last_name = serializers.CharField(source='member.last_name', read_only=True)
+
     class Meta:
         model = Loan
-        fields = '__all__'
-        read_only_fields = ['return_date', 'status']
+        fields = [
+            'id', 'copy', 'member', 'loan_date', 'due_date', 'return_date', 'status',
+            'book_title', 'member_first_name', 'member_last_name'
+        ]
 
     def validate(self, data):
         """
@@ -222,10 +228,16 @@ class ReservationSerializer(serializers.ModelSerializer):
       - отсутствие дублирующего активного бронирования,
       - корректность даты истечения.
     """
+    book_title = serializers.CharField(source='book.title', read_only=True)
+    member_first_name = serializers.CharField(source='member.first_name', read_only=True)
+    member_last_name = serializers.CharField(source='member.last_name', read_only=True)
+
     class Meta:
         model = Reservation
-        fields = '__all__'
-        read_only_fields = ['status']
+        fields = [
+            'id', 'book', 'member', 'reservation_date', 'expiry_date', 'status',
+            'book_title', 'member_first_name', 'member_last_name'  # ← ДОБАВЛЕНО
+        ]
 
     def validate(self, data):
         """
