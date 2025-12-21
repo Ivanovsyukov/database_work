@@ -3,6 +3,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import PublisherAutocomplete from './PublisherAutocomplete';
 import BookAutocomplete from './BookAutocomplete';
+import AuthorAutocompleteMultiselect from './AuthorAutocompleteMultiselect';
 
 export default function BookManagement() {
   const [newBookData, setNewBookData] = useState({
@@ -11,6 +12,7 @@ export default function BookManagement() {
     publication_year: new Date().getFullYear(),
     genre: '',
     publisher_id: null,
+    author_ids: [],
   });
   const [message, setMessage] = useState('');
 
@@ -52,6 +54,7 @@ export default function BookManagement() {
         publication_year: new Date().getFullYear(),
         genre: '',
         publisher_id: null,
+        author_ids: [],
       });
     } catch (err) {
       setMessage('Ошибка: ' + JSON.stringify(err.response?.data));
@@ -77,6 +80,7 @@ export default function BookManagement() {
         genre: b.genre || '',
         publisher_id: b.publisher?.id || null,
         publisher_name: b.publisher?.name || '',
+        author_ids: b.authors?.map(a => a.id) || [],
       });
     } catch (err) {
       console.error(err);
@@ -109,6 +113,11 @@ export default function BookManagement() {
 
     setEditMessage('');
 
+    const authorIdsToSend = Array.isArray(editBookData.author_ids)
+      ? editBookData.author_ids
+      : [];
+
+
     if (!editBookData.publisher_id) {
       setEditMessage('Ошибка: выберите или создайте издательство');
       return;
@@ -121,6 +130,7 @@ export default function BookManagement() {
         publication_year: editBookData.publication_year,
         genre: editBookData.genre,
         publisher_id: editBookData.publisher_id,
+        author_ids: authorIdsToSend,
       });
       setEditMessage('OK: Книга обновлена');
     } catch (err) {
@@ -162,6 +172,20 @@ export default function BookManagement() {
           onChange={(e) => setNewBookData((prev) => ({ ...prev, genre: e.target.value }))}
           style={{ width: '100%', padding: '8px', margin: '6px 0' }}
         />
+
+        <div style={{ margin: '10px 0' }}>
+          <label>Авторы:</label>
+          <AuthorAutocompleteMultiselect
+            selectedAuthors={newBookData.authors || []}
+            onChange={(authors) => 
+              setNewBookData(prev => ({ 
+                ...prev, 
+                authors, 
+                author_ids: authors.map(a => a.id) 
+              }))
+            }
+          />
+        </div>
 
         <div style={{ margin: '10px 0' }}>
           <label>Издательство:</label>
@@ -224,6 +248,20 @@ export default function BookManagement() {
             onChange={(e) => setEditBookData((prev) => ({ ...prev, genre: e.target.value }))}
             style={{ width: '100%', padding: '8px', margin: '6px 0' }}
           />
+
+          <div style={{ margin: '10px 0' }}>
+            <label>Авторы:</label>
+            <AuthorAutocompleteMultiselect
+              selectedAuthors={newBookData.authors || []}
+              onChange={(authors) => 
+                setNewBookData(prev => ({ 
+                  ...prev, 
+                  authors, 
+                  author_ids: authors.map(a => a.id) 
+                }))
+              }
+            />
+          </div>
 
           <div style={{ margin: '10px 0' }}>
             <label>Издательство:</label>

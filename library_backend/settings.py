@@ -22,49 +22,76 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-mo=dliprbo8!0crmgi4rc6*mw%4r8im9bb*0!n3tpu_jz@z&)v'
 
-# SECURITY WARNING: don't run with debug turned on in production!
+# Режим отладки: включает детальные ошибки и автоматическую перезагрузку.
 DEBUG = True
-
+# Пустой список разрешает только localhost при DEBUG=True.
 ALLOWED_HOSTS = []
 
 
-# Application definition
-
+# ==============================================================================
+# ПОДКЛЮЧЕННЫЕ ПРИЛОЖЕНИЯ
+# ==============================================================================
+# Порядок имеет значение: приложения, перечисленные первыми, имеют приоритет при разрешении конфликтов шаблонов/статики.
 INSTALLED_APPS = [
+    # Междоменная политика безопасности (CORS) — нужна для запросов с React-фронтенда
     'corsheaders',
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'rest_framework',
-    'django_extensions',
-    'library'
+    # Стандартные приложения Django
+    'django.contrib.admin',        # Админка
+    'django.contrib.auth',         # Аутентификация пользователей
+    'django.contrib.contenttypes', # Типы контента (используется auth и другими)
+    'django.contrib.sessions',     # Управление сессиями (для staff login/logout)
+    'django.contrib.messages',     # Сообщения пользователю (например, об успешной операции)
+    'django.contrib.staticfiles',  # Работа со статическими файлами
+    # Сторонние библиотеки
+    'rest_framework',              # Django REST Framework — для API
+    'django_extensions',           # Утилиты для разработки (например, shell_plus)
+    # Кастомное приложение проекта — содержит модели, views и логику библиотечной системы
+    'library',
 ]
 
+# Последовательность обработки запросов и ответов.
 MIDDLEWARE = [
+    # Обработка CORS-заголовков — должна быть первой среди пользовательских middleware
     'corsheaders.middleware.CorsMiddleware',
+    
+    # Защита от распространённых уязвимостей
     'django.middleware.security.SecurityMiddleware',
+    
+    # Управление сессиями
     'django.contrib.sessions.middleware.SessionMiddleware',
+    
+    # Общие функции: обработка слэшей, редиректы
     'django.middleware.common.CommonMiddleware',
+    
+    # Защита от CSRF-атак
     'django.middleware.csrf.CsrfViewMiddleware',
+    
+    # Аутентификация пользователей (для админки)
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    
+    # Сообщения пользователю (например, уведомления о штрафах)
     'django.contrib.messages.middleware.MessageMiddleware',
+    
+    # Защита от clickjacking (встраивание сайта в iframe)
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'library_backend.urls'
 
+ROOT_URLCONF = 'library_backend.urls' # Главный файл маршрутов проекта
+
+# Используется только для админки Django и возможных HTML-страниц (все остальное — REST API).
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
+        'DIRS': [],  # Дополнительные директории шаблонов (не используются в текущем проекте)
+        'APP_DIRS': True,  # Автоматический поиск шаблонов в папке templates/ каждого приложения
         'OPTIONS': {
             'context_processors': [
+                # Делает request доступным в шаблонах
                 'django.template.context_processors.request',
+                # Делает user и auth-данные доступными в шаблонах (для админки)
                 'django.contrib.auth.context_processors.auth',
+                # Делает messages доступными в шаблонах
                 'django.contrib.messages.context_processors.messages',
             ],
         },
@@ -76,13 +103,13 @@ WSGI_APPLICATION = 'library_backend.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
+# Используется PostgreSQL согласно ТЗ проекта.
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'library_db',      # название базы
         'USER': 'postgres',        # пользователь PostgreSQL
-        'PASSWORD': '',            # пароль от него
+        'PASSWORD': 'bo2005ok',            # пароль от него
         'HOST': 'localhost',       # адрес (или имя контейнера)
         'PORT': '5432',            # порт PostgreSQL
     }
@@ -93,32 +120,21 @@ DATABASES = {
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},  # Не похож на имя/логин
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},             # Минимальная длина
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},            # Не из списка популярных
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},           # Не только цифры
 ]
+
 
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
-
+# Проект использует английский интерфейс и UTC-время для единообразия хранения даты/времени в БД.
 LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'UTC'
-
-USE_I18N = True
-
-USE_TZ = True
-
+TIME_ZONE = 'UTC'              # Все datetime хранятся в UTC (USE_TZ=True)
+USE_I18N = True                # Включена поддержка переводов (для админки)
+USE_TZ = True                  # Используются timezone-aware datetime
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
@@ -130,8 +146,9 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Разрешает запросы с фронтенда на http://localhost:5173 (Vite dev server).
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # порт Vite
+    "http://localhost:5173",  # Порт по умолчанию для React + Vite
 ]
 
 CORS_ALLOW_CREDENTIALS = True

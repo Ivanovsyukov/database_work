@@ -1,4 +1,3 @@
-// frontend/src/components/ReservationList.jsx
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import BookAutocomplete from './BookAutocomplete';
