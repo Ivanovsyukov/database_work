@@ -424,3 +424,46 @@ def update_member_membership_status(member: Member):
     if new_status != member.membership_status:
         member.membership_status = new_status
         member.save(update_fields=['membership_status'])
+
+
+def _sync_fine_for_loan(loan: Loan, fine_amount: Decimal):
+    fine, created = Fine.objects.get_or_create(
+        loan=loan,
+        defaults={
+            'member': loan.member,
+            'fine_amount': fine_amount,
+            'status': 'pending',
+        },
+    )
+    if not created and fine.status == 'pending' and fine.fine_amount != fine_amount:
+        fine.fine_amount = fine_amount
+        fine.save(update_fields=['fine_amount'])
+
+
+def recalculate_fines_for_reports():
+    today = timezone.now().date()
+
+    open_overdue_loans = (
+        Loan.objects
+        .filter(return_date__isnull=True, due_date__lt=today)
+        .select_related('member')
+    )
+    for loan in open_overdue_loans:
+        if loan.status != 'overdue':
+            loan.status = 'overdue'
+            loan.save(update_fields=['status'])
+        overdue_days = (today - loan.due_date).days
+        if overdue_days > 0:
+            fine_amount = Decimal(overdue_days) * Decimal('10.00')
+            _sync_fine_for_loan(loan, fine_amount)
+
+    returned_late_loans = (
+        Loan.objects
+        .filter(return_date__isnull=False, return_date__gt=F('due_date'))
+        .select_related('member')
+    )
+    for loan in returned_late_loans:
+        overdue_days = (loan.return_date - loan.due_date).days
+        if overdue_days > 0:
+            fine_amount = Decimal(overdue_days) * Decimal('10.00')
+            _sync_fine_for_loan(loan, fine_amount)

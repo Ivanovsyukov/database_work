@@ -8,7 +8,8 @@ from django.contrib.auth import authenticate, login, logout
 
 from .models import (
     Author, Publisher, Book, BookAuthor, BookCopy,
-    Member, Staff, Loan, Fine, Reservation, update_member_membership_status
+    Member, Staff, Loan, Fine, Reservation, update_member_membership_status,
+    recalculate_fines_for_reports
 )
 from .serializers import (
     AuthorSerializer, PublisherSerializer, BookSerializer, BookAuthorSerializer,
@@ -362,6 +363,7 @@ class FinesSummaryReport(APIView):
     Используется администратором для финансового контроля.
     """
     def get(self, request):
+        recalculate_fines_for_reports()
         total_sum = Fine.objects.aggregate(total=Sum("fine_amount"))["total"] or 0
         paid_sum = Fine.objects.filter(status="paid").aggregate(total=Sum("fine_amount"))["total"] or 0
         unpaid_count = Fine.objects.filter(status="pending").count()

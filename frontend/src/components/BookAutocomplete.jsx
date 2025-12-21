@@ -100,7 +100,10 @@ export default function BookAutocomplete({ value, onChange, placeholder = "На�
           {suggestions.map(book => (
             <li
               key={book.id}
-              onClick={() => handleSelect(book)}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSelect(book);
+              }}
               style={{
                 padding: '6px 8px',
                 cursor: 'pointer',
