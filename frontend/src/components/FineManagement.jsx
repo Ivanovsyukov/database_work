@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
+import MemberAutocomplete from './MemberAutocomplete';
+
 export default function FineManagement() {
   const [fines, setFines] = useState([]);
-  const [memberId, setMemberId] = useState('');
+  const [selectedMemberId, setSelectedMemberId] = useState(null); 
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [lastEndpoint, setLastEndpoint] = useState('/fines');
@@ -13,6 +15,7 @@ export default function FineManagement() {
     setMessage('');
     setLastEndpoint(endpoint);
     try {
+      await axios.post('/fines/prepare/'); 
       const res = await axios.get(endpoint);
       setFines(res.data);
     } catch (err) {
@@ -29,11 +32,11 @@ export default function FineManagement() {
   }, []);
 
   const handleFilterByMember = () => {
-    if (!memberId) {
-      setMessage('Ошибка: укажите ID читателя');
+    if (!selectedMemberId) {
+      setMessage('Выберите читателя');
       return;
     }
-    fetchFines(`/fines/member/${memberId}`);
+    fetchFines(`/fines/member/${selectedMemberId}`); 
   };
 
   const getFineStatus = (fine) => {
@@ -60,14 +63,14 @@ export default function FineManagement() {
         <button onClick={() => fetchFines('/fines')} style={{ marginRight: '10px' }}>
           Показать все
         </button>
-        <input
-          type="number"
-          placeholder="ID читателя"
-          value={memberId}
-          onChange={(e) => setMemberId(e.target.value)}
-          style={{ marginRight: '10px' }}
+        <MemberAutocomplete
+          value={selectedMemberId}
+          onChange={(memberId) => setSelectedMemberId(memberId)}
+          placeholder="ФИО читателя..."
         />
-        <button onClick={handleFilterByMember}>Показать по читателю</button>
+        <button onClick={handleFilterByMember} style={{ marginLeft: '10px' }}>
+          Показать по читателю
+        </button>
       </div>
 
       {message && (
@@ -97,7 +100,7 @@ export default function FineManagement() {
               {fines.map(f => (
                 <tr key={f.id}>
                   <td>{f.id}</td>
-                  <td>{f.loan?.member?.first_name} {f.loan?.member?.last_name}</td>
+                  <td>{f.member_last_name} {f.member_first_name}</td>
                   <td>{f.fine_amount} руб</td>
                   <td>{getFineStatus(f) === 'paid' ? 'Оплачен' : 'Не оплачен'}</td>
                   <td>{f.paid_date || '-'}</td>

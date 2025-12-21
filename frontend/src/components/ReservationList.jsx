@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import BookAutocomplete from './BookAutocomplete';
+import MemberAutocomplete from './MemberAutocomplete';
 
 export default function ReservationList() {
   const [reservations, setReservations] = useState([]);
   const [selectedBookId, setSelectedBookId] = useState(null);
-  const [memberId, setMemberId] = useState('');
+  const [selectedMemberId, setSelectedMemberId] = useState(null);
   const [expiryDate, setExpiryDate] = useState(() => {
     const d = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     return d.toISOString().slice(0, 10);
@@ -13,7 +14,7 @@ export default function ReservationList() {
   const [message, setMessage] = useState('');
 
   const fetchActiveReservations = async () => {
-    try {
+    try{
       const res = await axios.get('/reservations/active');
       setReservations(res.data);
     } catch (err) {
@@ -24,7 +25,6 @@ export default function ReservationList() {
 
   useEffect(() => {
     let cancelled = false;
-
     (async () => {
       try {
         const res = await axios.get('/reservations/active');
@@ -34,17 +34,14 @@ export default function ReservationList() {
         if (!cancelled) setMessage('Ошибка загрузки бронирований');
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
     setMessage('');
 
-    if (!selectedBookId || !memberId || !expiryDate) {
+    if (!selectedBookId || !selectedMemberId || !expiryDate) {
       setMessage('Ошибка: заполните книгу, читателя и дату истечения');
       return;
     }
@@ -52,12 +49,12 @@ export default function ReservationList() {
     try {
       await axios.post('/reservations', {
         book: selectedBookId,
-        member: Number(memberId),
+        member: selectedMemberId,
         expiry_date: expiryDate,
       });
       setMessage('OK: Бронирование создано');
       setSelectedBookId(null);
-      setMemberId('');
+      setSelectedMemberId(null);
       fetchActiveReservations();
     } catch (err) {
       setMessage('Ошибка: ' + JSON.stringify(err.response?.data || err.message));
@@ -91,16 +88,12 @@ export default function ReservationList() {
         </div>
 
         <div style={{ marginBottom: '12px' }}>
-          <label>
-            ID читателя:
-            <input
-              type="number"
-              value={memberId}
-              onChange={(e) => setMemberId(e.target.value)}
-              style={{ width: '100%', padding: '6px', marginTop: '4px' }}
-              required
-            />
-          </label>
+          <label>Читатель:</label>
+          <MemberAutocomplete
+            value={selectedMemberId}
+            onChange={(memberId) => setSelectedMemberId(memberId)}
+            placeholder="Введите ФИО читателя..."
+          />
         </div>
 
         <div style={{ marginBottom: '12px' }}>
@@ -125,22 +118,48 @@ export default function ReservationList() {
       </form>
 
       <h3>Активные бронирования</h3>
-      <button onClick={fetchActiveReservations} style={{ padding: '6px 10px' }}>
+      <button onClick={fetchActiveReservations} style={{ padding: '6px 10px', marginBottom: '10px' }}>
         Обновить
       </button>
       {reservations.length === 0 ? (
         <p>Нет активных бронирований</p>
       ) : (
-        <ul>
-          {reservations.map(r => (
-            <li key={r.id}>
-              #{r.id}: Книга ID {r.book} - Читатель ID {r.member} (до {r.expiry_date})
-              <button onClick={() => handleCancel(r.id)} style={{ marginLeft: '10px', color: 'red' }}>
-                Отменить
-              </button>
-            </li>
-          ))}
-        </ul>
+        <table border="1" cellPadding="8" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Книга</th>
+              <th>Читатель</th>
+              <th>Дата истечения</th>
+              <th>Действие</th>
+            </tr>
+          </thead>
+          <tbody>
+            {reservations.map(r => (
+              <tr key={r.id}>
+                <td>{r.id}</td>
+                <td>{r.book_title}</td>
+                <td>{r.member_last_name} {r.member_first_name}</td>
+                <td>{r.expiry_date}</td>
+                <td>
+                  <button 
+                    onClick={() => handleCancel(r.id)} 
+                    style={{ 
+                      padding: '4px 8px', 
+                      background: '#dc3545', 
+                      color: 'white', 
+                      border: 'none', 
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Отменить
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   );

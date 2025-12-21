@@ -165,9 +165,16 @@ class LoanSerializer(serializers.ModelSerializer):
         - проверку статуса читателя,
         - проверку доступности копии.
     """
+    book_title = serializers.CharField(source='copy.book.title', read_only=True)
+    member_first_name = serializers.CharField(source='member.first_name', read_only=True)
+    member_last_name = serializers.CharField(source='member.last_name', read_only=True)
+
     class Meta:
         model = Loan
-        fields = '__all__'
+        fields = [
+            'id', 'copy', 'member', 'loan_date', 'due_date', 'return_date', 'status',
+            'book_title', 'member_first_name', 'member_last_name'
+        ]
         read_only_fields = ['return_date', 'status']
 
     def validate(self, data):
@@ -207,10 +214,16 @@ class FineSerializer(serializers.ModelSerializer):
     Поле `issue_date` - только для чтения.
     Оплата штрафа выполняется через метод `fine.pay()`.
     """
+    member_first_name = serializers.CharField(source='loan.member.first_name', read_only=True)
+    member_last_name = serializers.CharField(source='loan.member.last_name', read_only=True)
+
     class Meta:
         model = Fine
-        fields = '__all__'
-        read_only_fields = ['issue_date']
+        fields = [
+            'id', 'loan', 'fine_amount', 'issue_date', 'paid_date',
+            'member_first_name', 'member_last_name'
+        ]
+        read_only_fields = ['issue_date', 'paid_date', 'member_first_name', 'member_last_name']
 
 
 class ReservationSerializer(serializers.ModelSerializer):
@@ -222,9 +235,16 @@ class ReservationSerializer(serializers.ModelSerializer):
       - отсутствие дублирующего активного бронирования,
       - корректность даты истечения.
     """
+    book_title = serializers.CharField(source='book.title', read_only=True)
+    member_first_name = serializers.CharField(source='member.first_name', read_only=True)
+    member_last_name = serializers.CharField(source='member.last_name', read_only=True)
+
     class Meta:
         model = Reservation
-        fields = '__all__'
+        fields = [
+            'id', 'book', 'member', 'reservation_date', 'expiry_date', 'status',
+            'book_title', 'member_first_name', 'member_last_name'  # ← ДОБАВЛЕНО
+        ]
         read_only_fields = ['status']
 
     def validate(self, data):
