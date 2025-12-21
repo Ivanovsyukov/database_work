@@ -15,6 +15,7 @@ import CopyManagement from './components/CopyManagement';
 import AuthorManagement from './components/AuthorManagement';
 import LoanDashboard from './components/LoanDashboard';
 import Reports from './components/Reports';
+import StaffManagement from './components/StaffManagment';
 
 export default function App(){
   const [staff, setStaff] = useState(() => {
@@ -139,12 +140,20 @@ export default function App(){
               Выдачи
             </button>
             {isAdmin && (
-              <button
-                onClick={() => setActiveTab('reports')}
-                style={tabStyle(activeTab === 'reports')}
-              >
-                Отчёты
-              </button>
+              <>
+                <button
+                  onClick={() => setActiveTab('reports')}
+                  style={tabStyle(activeTab === 'reports')}
+                >
+                  Отчёты
+                </button>
+                <button
+                  onClick={() => setActiveTab('staff-management')}
+                  style={tabStyle(activeTab === 'staff-management')}
+                >
+                  Управление сотрудниками
+                </button>
+              </>
             )}
           </>
         )}
@@ -165,6 +174,7 @@ export default function App(){
       {canManage && activeTab === 'copy-management' && <CopyManagement />}
       {canManage && activeTab === 'loan-dashboard' && <LoanDashboard />}
       {isAdmin && activeTab === 'reports' && <Reports />}
+      {isAdmin && activeTab === 'staff-management' && <StaffManagement isAdmin={isAdmin} />}
     </div>
   );
 }

@@ -161,3 +161,5 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
 }
+
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend' #Выводит в консоль сообщение о доступности книги

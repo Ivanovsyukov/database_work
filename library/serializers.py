@@ -76,12 +76,16 @@ class BookSerializer(serializers.ModelSerializer):
         required=False
     )
 
+    total_copies = serializers.SerializerMethodField(read_only=True)
+    available_copies = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = Book
         fields = [
             'id', 'title', 'isbn', 'publication_year',
             'genre', 'publisher', 'publisher_id',
-            'authors', 'author_ids'
+            'authors', 'author_ids',
+            'total_copies', 'available_copies'
         ]
 
     def create(self, validated_data):
@@ -98,6 +102,12 @@ class BookSerializer(serializers.ModelSerializer):
         if author_ids is not None:
             instance.authors.set(author_ids)
         return instance
+    
+    def get_total_copies(self, obj):
+        return obj.copies.count()
+
+    def get_available_copies(self, obj):
+        return obj.copies.filter(status='available').count()
 
 class BookAuthorSerializer(serializers.ModelSerializer):
     """
@@ -200,7 +210,7 @@ class FineSerializer(serializers.ModelSerializer):
     class Meta:
         model = Fine
         fields = '__all__'
-        read_only_fields = ['issue_date', 'status']
+        read_only_fields = ['issue_date']
 
 
 class ReservationSerializer(serializers.ModelSerializer):

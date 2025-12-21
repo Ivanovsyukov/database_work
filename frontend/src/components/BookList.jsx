@@ -111,15 +111,32 @@ export default function BookList() {
       {books.length === 0 ? (
         <p>Нет книг</p>
       ) : (
-        <ul>
-          {books.map(book => (
-            <li key={book.id}>
-              <strong>{book.title}</strong> ({book.isbn}) - {book.publication_year}
-              {book.genre && ` - ${book.genre}`}
-              {book.publisher?.name && ` — ${book.publisher.name}`}
-            </li>
-          ))}
-        </ul>
+        <table border="1" cellPadding="8" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th>Название</th>
+              <th>ISBN</th>
+              <th>Год</th>
+              <th>Жанр</th>
+              <th>Издательство</th>
+              <th>Копии (всего)</th>
+              <th>Доступно</th>
+            </tr>
+          </thead>
+          <tbody>
+            {books.map(book => (
+              <tr key={book.id}>
+                <td><strong>{book.title}</strong></td>
+                <td>{book.isbn}</td>
+                <td>{book.publication_year}</td>
+                <td>{book.genre || '-'}</td>
+                <td>{book.publisher?.name || '-'}</td>
+                <td>{book.total_copies}</td>  {/* ← новое поле */}
+                <td>{book.available_copies}</td> {/* ← новое поле */}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   );

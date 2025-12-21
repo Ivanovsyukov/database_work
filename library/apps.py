@@ -12,3 +12,6 @@ class LibraryConfig(AppConfig):
     # Имя приложения — должно совпадать с названием папки.
     # Django использует его, чтобы находить модели, миграции, шаблоны и т.д.
     name = 'library'
+
+    def ready(self):
+        import library.models 

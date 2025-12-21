@@ -36,10 +36,16 @@ export default function FineManagement() {
     fetchFines(`/fines/member/${memberId}`);
   };
 
+  const getFineStatus = (fine) => {
+    return fine.paid_date ? 'paid' : 'pending';
+  };
+
   const handlePay = async (id) => {
     try {
       await axios.put(`/fines/${id}/pay`);
-      setFines(fines.map(f => f.id === id ? { ...f, status: 'paid' } : f));
+      setFines(fines.map(f => 
+        f.id === id ? { ...f, paid_date: new Date().toISOString().split('T')[0] } : f
+      ));
       alert('Штраф оплачен');
     } catch {
       alert('Ошибка оплаты');
@@ -91,11 +97,12 @@ export default function FineManagement() {
               {fines.map(f => (
                 <tr key={f.id}>
                   <td>{f.id}</td>
-                  <td>{f.member}</td>
+                  <td>{f.loan?.member?.first_name} {f.loan?.member?.last_name}</td>
                   <td>{f.fine_amount} руб</td>
-                  <td>{f.status}</td>
+                  <td>{getFineStatus(f) === 'paid' ? 'Оплачен' : 'Не оплачен'}</td>
+                  <td>{f.paid_date || '-'}</td>
                   <td>
-                    {f.status === 'pending' && (
+                    {!f.paid_date && (
                       <button onClick={() => handlePay(f.id)}>Оплатить</button>
                     )}
                   </td>

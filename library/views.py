@@ -5,6 +5,7 @@ from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import authenticate, login, logout
+from django.db import transaction
 
 from .models import (
     Author, Publisher, Book, BookAuthor, BookCopy,
@@ -206,11 +207,16 @@ class LoanViewSet(viewsets.ModelViewSet):
             return Response({"error": "Превышен лимит активных выдач (макс. 5)"}, status=400)
 
         # Создаём выдачу с автоматическим расчётом срока (14 дней)
+        due_date_for_input = request.data.get("due_date")
+        if due_date_for_input:
+            due_date_for_input = date.fromisoformat(due_date_for_input)
+        else:
+            due_date_for_input = date.today() + timedelta(days=14)
         loan = Loan.objects.create(
             copy=copy,
             member=member,
             loan_date=date.today(),
-            due_date=date.today() + timedelta(days=14)
+            due_date=due_date_for_input
         )
 
         serializer = self.get_serializer(loan)
@@ -255,7 +261,7 @@ class FineViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"], url_path="member/(?P<member_id>[^/.]+)")
     def by_member(self, request, member_id=None):
         """Получение всех штрафов конкретного читателя."""
-        fines = Fine.objects.filter(member_id=member_id)
+        fines = Fine.objects.filter(loan__member_id=member_id)
         return Response(self.get_serializer(fines, many=True).data)
 
     @action(detail=True, methods=["put"])
@@ -363,10 +369,17 @@ class FinesSummaryReport(APIView):
     Используется администратором для финансового контроля.
     """
     def get(self, request):
-        recalculate_fines_for_reports()
+        # ШАГ 1: Обновляем ВСЕ выдачи, у которых срок истёк
+        today = date.today()
+        with transaction.atomic():
+            overdue_loans = Loan.objects.filter(due_date__lt=today)
+            for loan in overdue_loans:
+                loan.save() 
+
+        # ШАГ 2: Теперь считаем сумму — данные актуальны
         total_sum = Fine.objects.aggregate(total=Sum("fine_amount"))["total"] or 0
-        paid_sum = Fine.objects.filter(status="paid").aggregate(total=Sum("fine_amount"))["total"] or 0
-        unpaid_count = Fine.objects.filter(status="pending").count()
+        paid_sum = Fine.objects.filter(paid_date__isnull=False).aggregate(total=Sum("fine_amount"))["total"] or 0
+        unpaid_count = Fine.objects.filter(paid_date__isnull=True).count()
 
         return Response({
             "total_fines": float(total_sum),

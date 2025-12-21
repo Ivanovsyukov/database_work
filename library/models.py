@@ -4,10 +4,14 @@ from datetime import date
 
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator, MinValueValidator, EmailValidator
-from django.db import models, transaction  # transaction — для группировки операций (всё или ничего)
+from django.db import models, transaction  # transaction — для группировки операций
 from django.db.models import Q, Sum, F
 from django.db.models.functions import ExtractYear, Now
 from django.utils import timezone
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from django.core.mail import send_mail
+from django.conf import settings
 
 # Вспомогательная функция: возвращает сегодняшнюю дату (с учётом временной зоны)
 def get_today_date():
@@ -34,11 +38,6 @@ LOAN_STATUS = (
     ('active', 'Active'),
     ('returned', 'Returned'),
     ('overdue', 'Overdue'),
-)
-
-FINE_STATUS = (
-    ('pending', 'Pending'),
-    ('paid', 'Paid'),
 )
 
 RESERVATION_STATUS = (
@@ -212,8 +211,12 @@ class Member(models.Model):
 
     def unpaid_fines_total(self):
         """Сумма всех неоплаченных штрафов"""
-        res = self.fines.filter(status='pending').aggregate(total=Sum('fine_amount'))
-        return res['total'] or Decimal('0.00')
+        # Суммируем fine_amount из Fine, связанного с Loan этого Member
+        total = Fine.objects.filter(
+            loan__member=self,
+            paid_date__isnull=True
+        ).aggregate(total=Sum('fine_amount'))['total']
+        return total or Decimal('0.00')
 
 
 class Staff(models.Model):
@@ -309,15 +312,21 @@ class Loan(models.Model):
             # При переходе в 'overdue' — создаём штраф
             if self.status == 'overdue':
                 days_overdue = (timezone.now().date() - self.due_date).days
-                amount = Decimal(max(days_overdue, 0)) * Decimal('10.00')  # 10 руб/день
-                Fine.objects.get_or_create(
+                amount = Decimal(max(days_overdue, 0)) * Decimal('10.00')
+                
+                # Получаем ИЛИ создаём штраф
+                fine, created = Fine.objects.get_or_create(
                     loan=self,
                     defaults={
                         'member': self.member,
                         'fine_amount': amount,
                         'status': 'pending',
-                    },
+                    }
                 )
+                # Если штраф уже существовал и не оплачен — обновляем сумму
+                if not created and fine.status == 'pending':
+                    fine.fine_amount = amount
+                    fine.save(update_fields=['fine_amount'])
 
         # После сохранения — проверяем и, возможно, блокируем читателя
         update_member_membership_status(self.member)
@@ -329,36 +338,36 @@ class Loan(models.Model):
 class Fine(models.Model):
     """Штраф за просрочку"""
     loan = models.OneToOneField(Loan, on_delete=models.CASCADE, related_name='fine')
-    member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='fines')
     fine_amount = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.00'))])
     issue_date = models.DateField(default=get_today_date)
     paid_date = models.DateField(null=True, blank=True)
-    status = models.CharField(max_length=20, choices=FINE_STATUS, default='pending')
 
     class Meta:
         db_table = "fines"
         constraints = [
             models.CheckConstraint(condition=Q(fine_amount__gte=0), name='fine_amount_non_negative'),
-            models.CheckConstraint(condition=Q(status__in=[s[0] for s in FINE_STATUS]), name='fine_status_valid'),
         ]
         ordering = ['-issue_date']
+    
+    def is_paid(self):
+        """Вспомогательный метод: оплачен ли штраф?"""
+        return self.paid_date is not None
 
     def pay(self, paid_date=None):
         """Оплата штрафа — переводит в статус 'paid' и обновляет статус читателя"""
         with transaction.atomic():
-            if self.status == 'paid':
+            if self.paid_date is not None:
                 return
-            self.status = 'paid'
             self.paid_date = paid_date or timezone.now().date()
             self.save(update_fields=['status', 'paid_date'])
-            update_member_membership_status(self.member)
+            update_member_membership_status(self.loan.member)
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        update_member_membership_status(self.member)  # при любом изменении — проверяем статус
+        update_member_membership_status(self.loan.member)  # при любом изменении — проверяем статус
 
     def __str__(self):
-        return f'Fine #{self.pk} for {self.member} — {self.fine_amount}'
+        return f'Fine #{self.pk} for {self.loan.member} — {self.fine_amount}'
 
 
 class Reservation(models.Model):
@@ -425,45 +434,38 @@ def update_member_membership_status(member: Member):
         member.membership_status = new_status
         member.save(update_fields=['membership_status'])
 
+@receiver(post_save, sender=BookCopy)
+def handle_book_copy_availability(sender, instance, created, **kwargs):
+    """
+    Отправляет email, когда копия становится available,
+    и есть активные бронирования на эту книгу.
+    """
+    # Пропускаем создание новой копии
+    if created:
+        return
 
-def _sync_fine_for_loan(loan: Loan, fine_amount: Decimal):
-    fine, created = Fine.objects.get_or_create(
-        loan=loan,
-        defaults={
-            'member': loan.member,
-            'fine_amount': fine_amount,
-            'status': 'pending',
-        },
-    )
-    if not created and fine.status == 'pending' and fine.fine_amount != fine_amount:
-        fine.fine_amount = fine_amount
-        fine.save(update_fields=['fine_amount'])
+    # Проверяем, что статус изменился на 'available'
+    # Для этого нужно сравнить с предыдущим значением
+    try:
+        old_copy = BookCopy.objects.get(pk=instance.pk)
+        if old_copy.status != 'available' and instance.status == 'available':
+            # Есть активные бронирования?
+            reservation = Reservation.objects.filter(
+                book=instance.book,
+                status='active'
+            ).order_by('reservation_date').first()
 
-
-def recalculate_fines_for_reports():
-    today = timezone.now().date()
-
-    open_overdue_loans = (
-        Loan.objects
-        .filter(return_date__isnull=True, due_date__lt=today)
-        .select_related('member')
-    )
-    for loan in open_overdue_loans:
-        if loan.status != 'overdue':
-            loan.status = 'overdue'
-            loan.save(update_fields=['status'])
-        overdue_days = (today - loan.due_date).days
-        if overdue_days > 0:
-            fine_amount = Decimal(overdue_days) * Decimal('10.00')
-            _sync_fine_for_loan(loan, fine_amount)
-
-    returned_late_loans = (
-        Loan.objects
-        .filter(return_date__isnull=False, return_date__gt=F('due_date'))
-        .select_related('member')
-    )
-    for loan in returned_late_loans:
-        overdue_days = (loan.return_date - loan.due_date).days
-        if overdue_days > 0:
-            fine_amount = Decimal(overdue_days) * Decimal('10.00')
-            _sync_fine_for_loan(loan, fine_amount)
+            if reservation:
+                member = reservation.member
+                try:
+                    send_mail(
+                        subject='Ваша бронь готова!',
+                        message=f'Книга "{instance.book.title}" доступна для выдачи.',
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[member.email],
+                        fail_silently=False,
+                    )
+                except Exception as e:
+                    print(f"Ошибка отправки email: {e}")
+    except BookCopy.DoesNotExist:
+        pass  # Копия только что создана — игнорируем

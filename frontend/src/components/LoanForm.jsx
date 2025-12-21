@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import BookAutocomplete from './BookAutocomplete';
 
@@ -8,7 +8,15 @@ export default function LoanForm() {
   const [selectedCopyId, setSelectedCopyId] = useState(null);
   const [memberId, setMemberId] = useState('');
   const [message, setMessage] = useState('');
+  const [dueDate, setDueDate] = useState('');
 
+  // При монтировании компонента — установи дату по умолчанию (+14 дней)
+  useEffect(() => {
+    const today = new Date();
+    const defaultDue = new Date(today);
+    defaultDue.setDate(today.getDate() + 14);
+    setDueDate(defaultDue.toISOString().split('T')[0]); // Формат YYYY-MM-DD
+  }, []);
   // При выборе книги — загружаем доступные копии
   const handleBookSelect = async (bookId) => {
     setSelectedBookId(bookId);
@@ -35,12 +43,19 @@ export default function LoanForm() {
       await axios.post('/loans', {
         copy: selectedCopyId,
         member: memberId,
+        due_date: dueDate,
       });
       setMessage('OK: Книга выдана');
+      // Сброс формы
       setSelectedBookId(null);
       setSelectedCopyId(null);
       setAvailableCopies([]);
       setMemberId('');
+      // Обновляем дату по умолчанию для следующей выдачи
+      const today = new Date();
+      const defaultDue = new Date(today);
+      defaultDue.setDate(today.getDate() + 14);
+      setDueDate(defaultDue.toISOString().split('T')[0]);
     } catch (err) {
       setMessage('Ошибка: ' + (err.response?.data?.error || 'не удалось выдать'));
     }
@@ -97,6 +112,19 @@ export default function LoanForm() {
             {message}
           </p>
         )}
+
+        <div style={{ marginBottom: '12px' }}>
+          <label>
+            Дата возврата:
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              style={{ width: '100%', padding: '6px', marginTop: '4px' }}
+              required
+            />
+          </label>
+        </div>
       </form>
     </div>
   );
