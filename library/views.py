@@ -1,16 +1,14 @@
 from datetime import date, timedelta
 from django.db.models import Count, Q, Sum
-from rest_framework import viewsets, status
+from rest_framework import viewsets
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.contrib.auth import authenticate, login, logout
 from django.db import transaction
 
 from .models import (
     Author, Publisher, Book, BookAuthor, BookCopy,
-    Member, Staff, Loan, Fine, Reservation, update_member_membership_status,
-    recalculate_fines_for_reports
+    Member, Staff, Loan, Fine, Reservation
 )
 from .serializers import (
     AuthorSerializer, PublisherSerializer, BookSerializer, BookAuthorSerializer,
