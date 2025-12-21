@@ -15,6 +15,7 @@ export default function FineManagement() {
     setMessage('');
     setLastEndpoint(endpoint);
     try {
+      await axios.post('/fines/prepare/'); 
       const res = await axios.get(endpoint);
       setFines(res.data);
     } catch (err) {
