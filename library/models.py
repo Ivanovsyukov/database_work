@@ -317,14 +317,10 @@ class Loan(models.Model):
                 # Получаем ИЛИ создаём штраф
                 fine, created = Fine.objects.get_or_create(
                     loan=self,
-                    defaults={
-                        'member': self.member,
-                        'fine_amount': amount,
-                        'status': 'pending',
-                    }
+                    defaults={'fine_amount': amount},
                 )
-                # Если штраф уже существовал и не оплачен — обновляем сумму
-                if not created and fine.status == 'pending':
+                # Если штраф уже существовал и не оплачен - обновляем сумму
+                if not created and fine.paid_date is None and fine.fine_amount != amount:
                     fine.fine_amount = amount
                     fine.save(update_fields=['fine_amount'])
 
@@ -354,12 +350,12 @@ class Fine(models.Model):
         return self.paid_date is not None
 
     def pay(self, paid_date=None):
-        """Оплата штрафа — переводит в статус 'paid' и обновляет статус читателя"""
+        """Оплата штрафа - выставляет paid_date и обновляет статус читателя"""
         with transaction.atomic():
             if self.paid_date is not None:
                 return
             self.paid_date = paid_date or timezone.now().date()
-            self.save(update_fields=['status', 'paid_date'])
+            self.save(update_fields=['paid_date'])
             update_member_membership_status(self.loan.member)
 
     def save(self, *args, **kwargs):

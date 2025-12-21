@@ -267,11 +267,11 @@ class FineViewSet(viewsets.ModelViewSet):
         """
         Оплата штрафа.
         Вызывает метод `pay()` из модели, который:
-          - переводит статус в 'paid',
+          - выставляет paid_date,
           - обновляет статус читателя (возможно, восстанавливает 'active').
         """
         fine = self.get_object()
-        if fine.status == 'paid':
+        if fine.paid_date is not None:
             return Response({"error": "Штраф уже оплачен"}, status=400)
 
         fine.pay()
@@ -372,7 +372,7 @@ class FinesSummaryReport(APIView):
         with transaction.atomic():
             overdue_loans = Loan.objects.filter(due_date__lt=today)
             for loan in overdue_loans:
-                loan.save() 
+                loan.save()
 
         # ШАГ 2: Теперь считаем сумму — данные актуальны
         total_sum = Fine.objects.aggregate(total=Sum("fine_amount"))["total"] or 0

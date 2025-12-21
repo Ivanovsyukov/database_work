@@ -204,8 +204,8 @@ class FineSerializer(serializers.ModelSerializer):
     """
     Сериализатор для штрафа.
     
-    Поля `issue_date` и `status` — только для чтения.
-    Статус меняется не через API, а через метод `fine.pay()` или автоматически при создании.
+    Поле `issue_date` - только для чтения.
+    Оплата штрафа выполняется через метод `fine.pay()`.
     """
     class Meta:
         model = Fine

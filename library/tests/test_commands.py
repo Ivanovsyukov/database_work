@@ -41,8 +41,8 @@ def test_check_overdue_loans_creates_fine_and_updates_status():
 
     fine = Fine.objects.get(loan=loan)
     assert fine.fine_amount == Decimal('10.00')  # 1 день × 10 руб
-    assert fine.status == 'pending'
-    assert fine.member == member
+    assert fine.paid_date is None
+    assert fine.loan.member == member
 
 
 @pytest.mark.django_db
