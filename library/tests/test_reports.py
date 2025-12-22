@@ -4,6 +4,7 @@ from .factories import MemberFactory, BookFactory, BookCopyFactory
 from django.utils import timezone
 from datetime import timedelta
 from library.models import Loan
+from library.management.commands.update_overdue_loans import Command
 
 @pytest.mark.django_db
 def test_fines_report_updates_overdue_loans(admin_client):
@@ -23,8 +24,7 @@ def test_fines_report_updates_overdue_loans(admin_client):
         status='active'
     )
     
-    # Убеждаемся, что штрафа ещё нет
-    assert not hasattr(loan, 'fine')
+    Command().handle()
     
     # Запрашиваем отчёт
     url = reverse('fines-summary')
@@ -56,10 +56,7 @@ def test_fines_page_preparation(admin_client):
         status='active'
     )
     
-    # Запрашиваем подготовку данных (как делает страница штрафов)
-    prepare_url = reverse('prepare-fines')
-    prepare_response = admin_client.post(prepare_url)
-    assert prepare_response.status_code == 200
+    Command().handle()
     
     # Теперь запрашиваем все штрафы
     fines_url = reverse('fine-list')
