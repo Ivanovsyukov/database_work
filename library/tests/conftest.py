@@ -1,50 +1,35 @@
 import pytest
-import platform
-import os
+from django.test import Client
+from rest_framework.test import APIClient
+from .factories import StaffFactory
 
-from django.conf import settings
-from pytest_postgresql.executor import PostgreSQLExecutor
+@pytest.fixture
+def api_client():
+    return APIClient()
 
+@pytest.fixture
+def logged_in_client():
+    """Клиент с реальной сессией (как в браузере)"""
+    client = Client()
+    staff = StaffFactory(email="librarian@test.com", role="librarian")
+    # Выполняем логин
+    client.post('/auth/login', {'email': 'librarian@test.com'})
+    return client
 
-# pytest-postgresql uses single quotes inside the `-o "..."` argument for pg_ctl,
-# which breaks on Windows (postgres receives "'stderr'" literally).
-if platform.system() == "Windows":
-    if not hasattr(os, "killpg"):
-        def _killpg(pid: int, sig: int) -> None:
-            try:
-                os.kill(pid, sig)
-            except (PermissionError, ProcessLookupError):
-                # pytest-postgresql already stops the server via `pg_ctl stop`.
-                # This avoids Windows-specific issues with process groups.
-                return
+@pytest.fixture
+def librarian():
+    return StaffFactory(role='librarian')
 
-        os.killpg = _killpg
+@pytest.fixture
+def admin_user():
+    return StaffFactory(role='admin')
 
-    PostgreSQLExecutor.BASE_PROC_START_COMMAND = (
-        '{executable} start -D "{datadir}" '
-        '-o "-F -p {port} -c log_destination=stderr '
-        "-c logging_collector=off "
-        "-c unix_socket_directories={unixsocketdir} {postgres_options}\" "
-        '-l "{logfile}" {startparams}'
-    )
+@pytest.fixture
+def auth_client(api_client, librarian):
+    api_client.force_authenticate(user=librarian)
+    return api_client
 
-
-@pytest.fixture(scope='session')
-def django_db_modify_db_settings(postgresql_proc):
-    from django.db import connections
-    from asgiref.local import Local
-
-    settings.DATABASES['default'] = {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'postgres',
-        'USER': 'postgres',
-        'PASSWORD': 'bo2005ok',
-        'HOST': postgresql_proc.host,
-        'PORT': postgresql_proc.port,
-        'ATOMIC_REQUESTS': True,
-    }
-
-    # pytest-django/Django may have already cached DB settings in the connection handler.
-    connections._settings = None
-    connections.__dict__.pop("settings", None)
-    connections._connections = Local()
+@pytest.fixture
+def admin_client(api_client, admin_user):
+    api_client.force_authenticate(user=admin_user)
+    return api_client

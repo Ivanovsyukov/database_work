@@ -1,61 +1,54 @@
 import factory
-from factory.django import DjangoModelFactory
-from library.models import Author, Publisher, Book, BookCopy, Member, Staff
+from django.utils import timezone
+from library.models import *
 
-
-class PublisherFactory(DjangoModelFactory):
-    class Meta:
-        model = Publisher
-    name = factory.Sequence(lambda n: f"Publisher {n}")
-
-
-class AuthorFactory(DjangoModelFactory):
+class AuthorFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Author
-    first_name = "John"
-    last_name = "Doe"
+    first_name = factory.Faker('first_name')
+    last_name = factory.Faker('last_name')
 
+class PublisherFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = Publisher
+    name = factory.Faker('company')
 
-class BookFactory(DjangoModelFactory):
+class BookFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Book
-        skip_postgeneration_save = True
-    title = "Test Book"
-    isbn = factory.Sequence(lambda n: f"{str(n).zfill(13)}")
-    publication_year = 2020
+    title = factory.Faker('sentence', nb_words=4)
+    isbn = factory.Faker('isbn13', separator='')
+    publication_year = factory.Faker('year')
     publisher = factory.SubFactory(PublisherFactory)
 
-    @factory.post_generation
-    def authors(self, create, extracted, **kwargs):
-        if not create:
-            return
-        if extracted:
-            for author in extracted:
-                self.authors.add(author)
-        else:
-            self.authors.add(AuthorFactory())
-
-
-class MemberFactory(DjangoModelFactory):
+class MemberFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Member
-    first_name = "Alice"
-    last_name = "Smith"
-    email = factory.Sequence(lambda n: f"alice{n}@example.com")
+    first_name = factory.Faker('first_name')
+    last_name = factory.Faker('last_name')
+    email = factory.Faker('email')
 
-
-class StaffFactory(DjangoModelFactory):
+class StaffFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Staff
+    first_name = factory.Faker('first_name')
+    last_name = factory.Faker('last_name')
+    email = factory.Faker('email')
+    role = 'librarian'
 
-    first_name = "Bob"
-    last_name = "Admin"
-    email = factory.Sequence(lambda n: f"staff{n}@example.com")
-    role = "librarian"
-
-
-class BookCopyFactory(DjangoModelFactory):
+class BookCopyFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = BookCopy
     book = factory.SubFactory(BookFactory)
-    barcode = factory.Sequence(lambda n: f"BC{n}")
+    barcode = factory.Sequence(lambda n: f"BC{n:06d}")
+
+class LoanFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = Loan
+    copy = factory.SubFactory(BookCopyFactory)
+    member = factory.SubFactory(MemberFactory)
+    loan_date = factory.LazyFunction(timezone.now().date)
+    due_date = factory.LazyAttribute(
+        lambda obj: obj.loan_date + timezone.timedelta(days=14)
+    )
+    status = 'active'

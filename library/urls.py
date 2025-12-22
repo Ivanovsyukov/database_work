@@ -46,9 +46,9 @@ urlpatterns = [
     # - popular-books: самые популярные книги, жанры, авторы
     # - member-activity: активность читателей, топ по просрочкам
     # - fines-summary: статистика по штрафам
-    path("reports/popular-books", PopularBooksReport.as_view()),
-    path("reports/member-activity", MemberActivityReport.as_view()),
-    path("reports/fines-summary", FinesSummaryReport.as_view()),
+    path("reports/member-activity", MemberActivityReport.as_view(), name='member-activity'),
+    path('reports/fines-summary/', FinesSummaryReport.as_view(), name='fines-summary'),
+    path('reports/popular-books/', PopularBooksReport.as_view(), name='popular-books'),
 
     # -------------------------------------------------------------------------
     # СТАНДАРТНЫЕ CRUD-МАРШРУТЫ ДЛЯ ВСЕХ МОДЕЛЕЙ

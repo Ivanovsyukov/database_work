@@ -166,6 +166,14 @@ class StaffViewSet(viewsets.ModelViewSet):
     """CRUD для сотрудников """
     queryset = Staff.objects.all()
     serializer_class = StaffSerializer
+    def create(self, request, *args, **kwargs):
+        # Запрещено создание админов через API
+        if request.data.get('role') == 'admin':
+            return Response(
+                {"error": "Нельзя создать админа через API"},
+                status=400
+            )
+        return super().create(request, *args, **kwargs)
 
 
 # ---------------------------- Вспомогательные функции ----------------------------
