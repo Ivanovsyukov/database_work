@@ -222,4 +222,5 @@ React.
 3. Примените миграции — `python manage.py migrate`
 4. Создайте суперпользователя (нужен для создания админов) — `python manage.py createsuperuser`
 5. Запустите бэкенд — `python manage.py runserver` (по умолчанию на `:8000`)
-6. Запустите фронтенд — `cd frontend`, затем `npm install` и `npm run dev` (по умолчанию на `:5173`)
+6. Запустите автоматическую проверку выдач - 'python scheduler.py'
+7. Запустите фронтенд — `cd frontend`, затем `npm install` и `npm run dev` (по умолчанию на `:5173`)

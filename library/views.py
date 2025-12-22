@@ -15,15 +15,6 @@ from .serializers import (
     BookCopySerializer, MemberSerializer, StaffSerializer,
     LoanSerializer, FineSerializer, ReservationSerializer
 )
-
-def update_overdue_fines():
-    """Обновляет статусы и штрафы для всех просроченных выдач"""
-    today = date.today()
-    with transaction.atomic():
-        overdue_loans = Loan.objects.filter(due_date__lt=today)
-        for loan in overdue_loans:
-            loan.save()
-
 # ---------------------------- Аутентификация сотрудников ----------------------------
 
 @api_view(["POST"])
@@ -391,10 +382,7 @@ class FinesSummaryReport(APIView):
     Используется администратором для финансового контроля.
     """
     def get(self, request):
-        # ШАГ 1: Обновляем ВСЕ выдачи, у которых срок истёк
-        update_overdue_fines()
-
-        # ШАГ 2: Теперь считаем сумму — данные актуальны
+        # Cчитаем сумму — данные актуальны
         total_sum = Fine.objects.aggregate(total=Sum("fine_amount"))["total"] or 0
         paid_sum = Fine.objects.filter(paid_date__isnull=False).aggregate(total=Sum("fine_amount"))["total"] or 0
         unpaid_count = Fine.objects.filter(paid_date__isnull=True).count()
@@ -405,9 +393,3 @@ class FinesSummaryReport(APIView):
             "unpaid_count": unpaid_count,
             "unpaid_total": float(total_sum - paid_sum),
         })
-
-@api_view(['POST'])
-def prepare_fines(request):
-    """Endpoint для подготовки штрафов (используется на странице FineManagement)"""
-    update_overdue_fines()
-    return Response({"status": "fines_updated"})

@@ -5,7 +5,7 @@ from .views import (
     BookCopyViewSet, MemberViewSet, StaffViewSet,
     LoanViewSet, FineViewSet, ReservationViewSet,
     login_view, logout_view,
-    PopularBooksReport, MemberActivityReport, FinesSummaryReport, prepare_fines
+    PopularBooksReport, MemberActivityReport, FinesSummaryReport
 )
 
 router = DefaultRouter(trailing_slash=False)
@@ -55,7 +55,4 @@ urlpatterns = [
     # -------------------------------------------------------------------------
     # Подключаем все маршруты, сгенерированные DefaultRouter
     path("", include(router.urls)),
-
-
-    path('fines/prepare/', prepare_fines, name='prepare-fines'),
 ]
